@@ -1,0 +1,28 @@
+version: "3"
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile-src
+    ports:
+    - "8000:80"
+    volumes:
+    - ./src:/var/www/html
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile-test
+    environment:
+    - SELENIUM_HOST=selenium
+    - SELENIUM_PORT=4444
+    - TARGET_HOST=web
+    volumes:
+    - ./test:/usr/test
+    depends_on:
+    - selenium
+    - web
+    entrypoint:
+    - ruby
+    - /usr/test/acceptance_test.rb
+  selenium:
+    image: selenium/standalone-firefox:3

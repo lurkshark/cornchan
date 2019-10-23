@@ -1,0 +1,7 @@
+FROM php:7.3-apache
+# Dependencies for dba extension
+RUN apt-get update && apt-get install -y \
+    liblmdb-dev \
+  && docker-php-ext-configure dba --enable-dba --with-lmdb \
+  && docker-php-ext-install dba \
+  && a2enmod rewrite
