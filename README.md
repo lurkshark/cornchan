@@ -1,15 +1,16 @@
 # cornchan
+[![Build Status](https://travis-ci.com/lurkshark/cornchan.svg?branch=master)](https://travis-ci.com/lurkshark/cornchan)
 
-## development
+## Development
 
-### server
+### Server
 
 ```sh
-# launches a server on http://localhost:8000
+# Launches a server on http://localhost:8000
 docker-compose -f "docker-compose.yml" up --build --detach
 ```
 
-### testing
+### Testing
 
 ```sh
 docker-compose -f "docker-compose.yml" up --build --exit-code-from test

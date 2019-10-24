@@ -17,12 +17,16 @@ services:
     - SELENIUM_PORT=4444
     - TARGET_HOST=web
     volumes:
-    - ./test:/usr/test
+    - ./test:/usr/src/test
     depends_on:
     - selenium
     - web
     entrypoint:
-    - ruby
-    - /usr/test/acceptance_test.rb
+    - rspec
+    - --require
+    - ./spec_helper
+    - --pattern
+    - "spec/*_spec.rb"
+    - --force-color
   selenium:
     image: selenium/standalone-firefox:3
