@@ -48,6 +48,21 @@ if (http_response_code() != 200) { ?>
     <p><a href="<?php echo $boardPath; ?>"><?php echo $boardPath; ?></a></p>
 <?php // End foreach board
     }
+} elseif (!empty($board) && empty($post)) { ?>
+    <h2><?php echo $board; ?></h2>
+    <div id="newthread">
+        <form method="post">
+<?php // If form wasn't filled-out right
+    if ($_SERVER['REQUEST_METHOD'] == 'POST' && empty($_POST['lorem'])) { ?>
+            <p>You need a headline</p>
+<?php
+    } ?>
+            <input type="text" name="lorem">
+            <textarea name="ipsum"></textarea>
+            <button>Submit</button>
+        </form>
+    </div>
+<?php
 } ?>
 </body>
 </html>

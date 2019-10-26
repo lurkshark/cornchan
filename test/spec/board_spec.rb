@@ -11,7 +11,7 @@ feature "Posting a new thread to a board" do
     within("#newthread") do
       fill_in "lorem", with: "Dope new thread"
       fill_in "ipsum", with: "I have so many feelings"
-      click_button "post"
+      click_button "Submit"
     end
 
     expect(page).to have_current_path("/corn/")
@@ -22,7 +22,7 @@ feature "Posting a new thread to a board" do
   scenario "when the headline and post are omitted" do
     visit "/corn/"
     within("#newthread") do
-      click_button "post"
+      click_button "Submit"
     end
 
     expect(page).to have_current_path("/corn/")
@@ -32,7 +32,7 @@ feature "Posting a new thread to a board" do
   scenario "when the headline is omitted" do
     visit "/corn/"
     within("#newthread") do
-      click_button "post"
+      click_button "Submit"
     end
 
     expect(page).to have_current_path("/corn/")
@@ -43,7 +43,7 @@ feature "Posting a new thread to a board" do
     visit "/corn/"
     within("#newthread") do
       fill_in "lorem", with: "Tell me ur feelings"
-      click_button "post"
+      click_button "Submit"
     end
 
     expect(page).to have_current_path("/corn/")
