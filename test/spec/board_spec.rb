@@ -6,7 +6,7 @@ feature "Visiting a board" do
 end
 
 feature "Posting a new thread to a board" do
-  scenario "when the form is fully filled-out" do
+  scenario "when the form is fully filled-out should show the new post" do
     visit "/corn/"
     within("#newthread") do
       fill_in "lorem", with: "Dope new thread"
@@ -19,7 +19,7 @@ feature "Posting a new thread to a board" do
     expect(page).to have_content("I have so many feelings")
   end
 
-  scenario "when the headline and post are omitted" do
+  scenario "when the headline and post are omitted should show an error" do
     visit "/corn/"
     within("#newthread") do
       click_button "Submit"
@@ -29,7 +29,7 @@ feature "Posting a new thread to a board" do
     expect(page).to have_content("You need a headline")
   end
 
-  scenario "when the headline is omitted" do
+  scenario "when the headline is omitted should show an error" do
     visit "/corn/"
     within("#newthread") do
       click_button "Submit"
@@ -39,7 +39,7 @@ feature "Posting a new thread to a board" do
     expect(page).to have_content("You need a headline")
   end
 
-  scenario "when the post is omitted" do
+  scenario "when the post is omitted should show the new empty-body post" do
     visit "/corn/"
     within("#newthread") do
       fill_in "lorem", with: "Tell me ur feelings"
