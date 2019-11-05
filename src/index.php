@@ -2,7 +2,7 @@
 header('X-Powered-By: Corn v0.1');
 extension_loaded('dba') or exit('The dba extension is not available!');
 in_array('lmdb', dba_handlers())
-    or in_array('dba', dba_handlers())
+    or in_array('db4', dba_handlers())
     or exit('Neither lmdb or db4 implementations are available for dba!');
 $DBA_HANDLER = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'db4';
 $DBA_PATH = $_ENV['CORN_DBA_PATH_OVERRIDE'] ?? './cornchan.db';
