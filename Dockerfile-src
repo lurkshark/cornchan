@@ -5,3 +5,5 @@ RUN apt-get update && apt-get install -y \
   && docker-php-ext-configure dba --enable-dba --with-lmdb \
   && docker-php-ext-install dba \
   && a2enmod rewrite
+# DBA path override for Travis CI build
+ENV CORN_DBA_PATH_OVERRIDE /tmp/cornchan.db
