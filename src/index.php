@@ -2,11 +2,9 @@
 header('X-Powered-By: Corn v0.1');
 extension_loaded('dba') or exit('The dba extension is not available!');
 in_array('lmdb', dba_handlers())
-    or in_array('db4', dba_handlers())
     or in_array('gdbm', dba_handlers())
-    or exit('No good implementations are available for dba!');
-$DBA_HANDLER = in_array('lmdb', dba_handlers()) ? 'lmdb'
-    : in_array('lmdb', dba_handlers()) ? 'gdbm' : 'db4';
+    or exit('Neither lmdb or gdbm implementations are available for dba!');
+$DBA_HANDLER = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'gdbm';
 $DBA_PATH = $_ENV['HOME'] . 'cornchan.db';
 
 // Utility functions
@@ -36,7 +34,8 @@ if (!file_exists($DBA_PATH)) {
 }
 
 // Open the db for reading
-$db = dba_open($DBA_PATH, 'r', $DBA_HANDLER);
+$db = dba_open($DBA_PATH, 'r', $DBA_HANDLER)
+    or exit('Can\'t open the db file!);
 
 // General use params
 $name = dba_fetch('metadata_name', $db);
