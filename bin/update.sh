@@ -1,5 +1,5 @@
 #!/bin/sh
-{
-  # curl -s 'https://api.travis-ci.com/lurkshark/cornchan.svg?branch=master' | grep pass
-  exit
-}
+wget --quiet --directory-prefix /home/public --input-file - << 'EOF'
+https://raw.githubusercontent.com/lurkshark/cornchan/master/src/.htaccess
+https://raw.githubusercontent.com/lurkshark/cornchan/master/src/index.php
+EOF
