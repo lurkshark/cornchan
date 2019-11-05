@@ -35,7 +35,7 @@ if (!file_exists($DBA_PATH)) {
 
 // Open the db for reading
 $db = dba_open($DBA_PATH, 'r', $DBA_HANDLER)
-    or exit('Can\'t open the db file!);
+    or exit('Can\'t open the db file!');
 
 // General use params
 $name = dba_fetch('metadata_name', $db);
