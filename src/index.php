@@ -5,7 +5,8 @@ in_array('lmdb', dba_handlers())
     or in_array('gdbm', dba_handlers())
     or exit('Neither lmdb or gdbm implementations are available for dba!');
 $DBA_HANDLER = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'gdbm';
-$DBA_PATH = $_ENV['HOME'] . 'cornchan.db';
+// Use the override when provided (e.g. Travis CI) otherwise use HOME dir
+$DBA_PATH = ($_ENV['CORN_DBA_PATH_OVERRIDE'] ?? $_ENV['HOME']) . 'cornchan.db';
 
 // Utility functions
 function dba_replace_encode($key, $value, $handle) {
