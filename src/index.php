@@ -95,54 +95,62 @@ if (!empty($BOARD) && !empty($NEW) && !empty($_POST['lorem'])) {
 <!DOCTYPE html>
 <html>
 <head>
-    <title><?php echo $NAME; ?></title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?php echo $NAME; ?></title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
 <?php // Check for error status code
 if (http_response_code() != 200) { ?>
-    <pre>Error <?php echo http_response_code(); ?></pre>
+  <h1>Error <?php echo http_response_code(); ?></h1>
 <?php // If at root path
 } elseif (empty($BOARD) && empty($THREAD)) {
     foreach ($BOARDS as $board) {
         $board_path = '/' . $board . '/'; ?>
-    <p><a href="<?php echo $board_path; ?>"><?php echo $board_path; ?></a></p>
+  <p><a href="<?php echo $board_path; ?>"><?php echo $board_path; ?></a></p>
 <?php // End foreach board
     }
 } elseif (!empty($BOARD) && empty($THREAD)) { ?>
-    <h2>/<?php echo $BOARD; ?>/</h2>
+  <header><h1>/<?php echo $BOARD; ?>/</h1></header>
+  <main>
 <?php // List threads for the board
     $current_id = dba_fetch($BOARD . '_head_next', $db);
     while ($current_id != $BOARD . '_tail') {
         $thread_headline = dba_fetch($current_id . '_headline', $db);
         $thread_message = dba_fetch($current_id . '_message', $db); ?>
-    <div id="thread-<?php echo $current_id; ?>">
-        <p><?php echo $thread_headline; ?></p>
-        <pre><?php echo $thread_message; ?></pre>
-    </div>
+    <article id="thread-<?php echo $current_id; ?>">
+      <header><h1><?php echo $thread_headline; ?></h1></header>
+      <main><p><?php echo $thread_message; ?></p></main>
+    </article>
 <?php // End of foreach thread loop
         $current_id = dba_fetch($current_id . '_next', $db);
     } ?>
-    <div id="newthread">
-        <h3>New Thread</h3>
+    <section id="newthread">
+      <header><h1>New Thread</h1></header>
+      <main>
         <form method="post" action="/<?php echo $BOARD; ?>/new">
 <?php // If form wasn't filled-out right
     if ($_SERVER['REQUEST_METHOD'] == 'POST' && empty($_POST['lorem'])) { ?>
-            <p>You need a headline</p>
+          <p>You need a headline</p>
 <?php
     } ?>
+          <label>Headline<br>
             <input type="text" name="lorem">
-            <br><textarea name="ipsum"></textarea>
-            <br><button>Submit</button>
+          </label><br>
+          <label>Message<br>
+            <textarea name="ipsum"></textarea>
+          </label><br>
+          <button>Submit</button>
         </form>
-    </div>
+      </main>
+    </section>
+  </main>
 <?php
 }
 // Final db close
 dba_close($db);
 // Calculate the milliseconds it took to render the page
 $exec_time = intval((microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]) * 1000); ?>
-    <pre><?php echo $exec_time; ?> milliseconds</pre>
+  <footer><small><?php echo $exec_time; ?> milliseconds</small></footer>
 </body>
 </html>
