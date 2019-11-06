@@ -1,4 +1,4 @@
-feature "Root path page" do
+feature "Visiting the root page" do
   scenario "lists links to the boards" do
     visit "/"
     expect(page).to have_link("corn")

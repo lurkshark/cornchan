@@ -10,11 +10,11 @@ $DBA_PATH = ($_ENV['CORN_DBA_PATH_OVERRIDE'] ?? $_ENV['HOME']) . 'cornchan.db';
 
 // Utility functions
 function dba_replace_encode($key, $value, $handle) {
-    return dba_replace($key, json_encode($value, JSON_FORCE_OBJECT), $handle);
+    return dba_replace($key, json_encode($value), $handle);
 }
 
 function dba_fetch_decode($key, $handle) {
-    return json_decode(dba_fetch($key, $handle), true);
+    return json_decode(dba_fetch($key, $handle));
 }
 
 // Create the db if it doesn't exist
@@ -39,30 +39,35 @@ $db = dba_open($DBA_PATH, 'r', $DBA_HANDLER)
     or exit('Can\'t open the db file!');
 
 // General use params
-$name = dba_fetch('metadata_name', $db);
-$boards = dba_fetch_decode('metadata_boards', $db);
-$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-preg_match('/^\/(' . join('|', $boards) . ')\/?(\d*)\/?$/', $path, $matches);
-$board = $matches[1];
-$post = $matches[2];
+$NAME = dba_fetch('metadata_name', $db);
+$BOARDS = dba_fetch_decode('metadata_boards', $db);
+$PATH = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+preg_match('/^(?:\/(' . join('|', $BOARDS) . '))?(?:\/(\d+))?(?:\/(new))?\/?$/',
+    $PATH, $matches);
+$BOARD = $matches[1];
+$THREAD = $matches[2];
+$NEW = $matches[3];
 
-// Return 404 on bad path
-if (empty($board) && empty($post) && $path != '/') {
+$CANONICAL = '/'; // Build expected path
+empty($BOARD)   or $CANONICAL .= $BOARD;
+empty($THREAD)  or $CANONICAL .= '/' . $THREAD;
+empty($NEW)     or $CANONICAL .= '/' . $NEW;
+if (!empty($BOARD) && empty($THREAD) && empty($NEW)) {
+    $CANONICAL .= '/';
+}
+
+// Return 404 on bad path; redirect if non-canonical
+if ((empty($BOARD) && empty($THREAD) && empty($NEW) && $PATH != '/')
+    || (empty($BOARD) && (!empty($THREAD) || !empty($NEW)))) {
     http_response_code(404);
-}
-
-// Redirect /board to /board/
-if (!empty($board) && empty($post) && $path != '/' . $board . '/') {
-    header('Location: /' . $board . '/', true, 301);
-}
-
-// Redirect /board/100/ to /board/100
-if (!empty($board) && !empty($post) && $path != '/' . $board . '/' . $post) {
-    header('Location: /' . $board . '/' . $post, true, 301);
+} elseif ($PATH != $CANONICAL) {
+    header('Location: ' . $CANONICAL, true, 301);
+    dba_close($db);
+    exit(0);
 }
 
 // If posting a new thread
-if (!empty($board) && empty($post) && !empty($_POST['lorem'])) {
+if (!empty($BOARD) && !empty($NEW) && !empty($_POST['lorem'])) {
     dba_close($db); // Close the db for reads and reopen for writes
     $db = dba_open($DBA_PATH, 'w', $DBA_HANDLER);
     
@@ -71,10 +76,10 @@ if (!empty($board) && empty($post) && !empty($_POST['lorem'])) {
     dba_replace('metadata_id', $current_id, $db);
 
     // Insert the new thread at the head of the board
-    $old_head_next = dba_fetch($board . '_head_next', $db);
-    dba_replace($board . '_head_next', $current_id, $db);
+    $old_head_next = dba_fetch($BOARD . '_head_next', $db);
+    dba_replace($BOARD . '_head_next', $current_id, $db);
     dba_replace($current_id . '_next', $old_head_next, $db);
-    dba_replace($current_id . '_prev', $board . '_head', $db);
+    dba_replace($current_id . '_prev', $BOARD . '_head', $db);
     dba_replace($old_head_next . '_prev', $current_id, $db);
 
     // Sanitize the inputs; truncate at max length
@@ -83,13 +88,14 @@ if (!empty($board) && empty($post) && !empty($_POST['lorem'])) {
     dba_replace($current_id . '_headline', substr($headline, 0, 64), $db);
     dba_replace($current_id . '_message', substr($message, 0, 4096), $db);
 
-    dba_close($db); // Close the db for writes and reopen for reads
-    $db = dba_open($DBA_PATH, 'r', $DBA_HANDLER);
+    header('Location: /' . $BOARD . '/', true, 302);
+    dba_close($db);
+    exit(0);
 } ?>
 <!DOCTYPE html>
 <html>
 <head>
-    <title><?php echo $name; ?></title>
+    <title><?php echo $NAME; ?></title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
@@ -98,17 +104,17 @@ if (!empty($board) && empty($post) && !empty($_POST['lorem'])) {
 if (http_response_code() != 200) { ?>
     <pre>Error <?php echo http_response_code(); ?></pre>
 <?php // If at root path
-} elseif (empty($board) && empty($post)) {
-    foreach ($boards as $board) {
+} elseif (empty($BOARD) && empty($THREAD)) {
+    foreach ($BOARDS as $board) {
         $board_path = '/' . $board . '/'; ?>
     <p><a href="<?php echo $board_path; ?>"><?php echo $board_path; ?></a></p>
 <?php // End foreach board
     }
-} elseif (!empty($board) && empty($post)) { ?>
-    <h2>/<?php echo $board; ?>/</h2>
+} elseif (!empty($BOARD) && empty($THREAD)) { ?>
+    <h2>/<?php echo $BOARD; ?>/</h2>
 <?php // List threads for the board
-    $current_id = dba_fetch($board . '_head_next', $db);
-    while ($current_id != $board . '_tail') {
+    $current_id = dba_fetch($BOARD . '_head_next', $db);
+    while ($current_id != $BOARD . '_tail') {
         $thread_headline = dba_fetch($current_id . '_headline', $db);
         $thread_message = dba_fetch($current_id . '_message', $db); ?>
     <div id="thread-<?php echo $current_id; ?>">
@@ -120,7 +126,7 @@ if (http_response_code() != 200) { ?>
     } ?>
     <div id="newthread">
         <h3>New Thread</h3>
-        <form method="post">
+        <form method="post" action="/<?php echo $BOARD; ?>/new">
 <?php // If form wasn't filled-out right
     if ($_SERVER['REQUEST_METHOD'] == 'POST' && empty($_POST['lorem'])) { ?>
             <p>You need a headline</p>
