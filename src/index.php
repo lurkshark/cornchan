@@ -149,8 +149,11 @@ if (http_response_code() != 200) { ?>
 }
 // Final db close
 dba_close($db);
-// Calculate the milliseconds it took to render the page
-$exec_time = intval((microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]) * 1000); ?>
-  <footer><small><?php echo $exec_time; ?> milliseconds</small></footer>
+// Calculate the milliseconds it took to render the page and last update
+$exec_time = intval((microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000);
+$last_updated = date('Y-m-d H:i', filemtime(__FILE__)); ?>
+  <footer>
+    <small><?php echo $last_updated; ?> / <?php echo $exec_time; ?>ms</small>
+  </footer>
 </body>
 </html>
