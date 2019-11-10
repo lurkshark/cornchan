@@ -83,10 +83,11 @@ if (!empty($BOARD) && !empty($NEW) && !empty($_POST['lorem'])) {
     dba_replace($old_head_next . '_prev', $current_id, $db);
 
     // Sanitize the inputs; truncate at max length
-    $headline = filter_var($_POST['lorem'], FILTER_SANITIZE_SPECIAL_CHARS);
+    $subject = filter_var($_POST['lorem'], FILTER_SANITIZE_SPECIAL_CHARS);
     $message = filter_var($_POST['ipsum'], FILTER_SANITIZE_SPECIAL_CHARS);
-    dba_replace($current_id . '_headline', substr($headline, 0, 64), $db);
+    dba_replace($current_id . '_subject', substr($subject, 0, 64), $db);
     dba_replace($current_id . '_message', substr($message, 0, 4096), $db);
+    dba_replace($current_id . '_time', time(), $db);
 
     header('Location: /' . $BOARD . '/', true, 302);
     dba_close($db);
@@ -98,6 +99,9 @@ if (!empty($BOARD) && !empty($NEW) && !empty($_POST['lorem'])) {
   <title><?php echo $NAME; ?></title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/normalize.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="/static/favicon.png">
 </head>
 <body>
 <?php // Check for error status code
@@ -115,11 +119,18 @@ if (http_response_code() != 200) { ?>
   <main>
 <?php // List threads for the board
     $current_id = dba_fetch($BOARD . '_head_next', $db);
-    while ($current_id != $BOARD . '_tail') {
-        $thread_headline = dba_fetch($current_id . '_headline', $db);
-        $thread_message = dba_fetch($current_id . '_message', $db); ?>
-    <article id="thread-<?php echo $current_id; ?>">
-      <header><h1><?php echo $thread_headline; ?></h1></header>
+    while ($current_id != $BOARD . '_tail' && empty($NEW)) {
+        $thread_subject = dba_fetch($current_id . '_subject', $db);
+        $thread_message = dba_fetch($current_id . '_message', $db);
+        $thread_time = dba_fetch($current_id . '_time', $db); ?>
+    <article id="thread<?php echo $current_id; ?>">
+      <header>
+        <hgroup>
+          <h1><?php echo $thread_subject; ?></h1>
+          <h2><?php echo $current_id; ?></h2>
+          <h3><time><?php echo date('Y-m-d H:i', $thread_time); ?></time></h3>
+        </hgroup>
+      </header>
       <main><p><?php echo $thread_message; ?></p></main>
     </article>
 <?php // End of foreach thread loop
@@ -134,13 +145,17 @@ if (http_response_code() != 200) { ?>
           <p>You need a headline</p>
 <?php
     } ?>
-          <label>Headline<br>
-            <input type="text" name="lorem">
-          </label><br>
-          <label>Message<br>
+          <p>
+            <label for="lorem">Subject</label>
+            <input type="text" name="lorem" autocomplete="off">
+          </p>
+          <p class="full">
+            <label for="ipsum">Message</label>
             <textarea name="ipsum"></textarea>
-          </label><br>
-          <button>Submit</button>
+          </p>
+          <p>
+            <button>Submit</button>
+          </p>
         </form>
       </main>
     </section>
