@@ -5,8 +5,8 @@ feature "Trailing slash redirects" do
   end
 
   scenario "thread path with trailing slash to without" do
-    visit "/corn/100/"
-    expect(page).to have_current_path("/corn/100")
+    visit "/corn/10001/"
+    expect(page).to have_current_path("/corn/10001")
   end
 
   scenario "new thread path with trailing slash to without" do
