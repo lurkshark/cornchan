@@ -1,6 +1,6 @@
 feature "Posting a new thread to a board" do
-  given(:subject) { Array.new(12) { Array('A'..'Z').sample }.join }
-  given(:message) { Array.new(128) { Array('a'..'z').sample }.join }
+  given(:subject) { Array.new(5) { CORPUS.sample }.join(" ") }
+  given(:message) { Array.new(64) { CORPUS.sample }.join(" ") }
 
   background do
     visit "/corn/new"

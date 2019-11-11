@@ -97,7 +97,7 @@ if (!empty($NEW) && $_SERVER['REQUEST_METHOD'] == 'POST') {
     dba_replace($current_id . '_replies_head_next', $current_id . '_replies_tail', $db);
     dba_replace($current_id . '_replies_tail_prev', $current_id . '_replies_head', $db);
 
-    $redirect_to = '/' . $BOARD . '/#thread' . $current_id;
+    $redirect_to = '/' . $BOARD . '/';
     header('Location: ' . $redirect_to, true, 302);
     dba_close($db);
     exit(0);
@@ -107,12 +107,18 @@ if (!empty($NEW) && $_SERVER['REQUEST_METHOD'] == 'POST') {
     dba_close($db); // Close the db for reads and reopen for writes
     $db = dba_open($DBA_PATH, 'w', $DBA_HANDLER);
 
-    // Insert the replying thread at the head of the board
-    $old_board_head_next = dba_fetch($BOARD . '_head_next', $db);
+    // Remove the replied-to thread from its place
+    $old_thread_next = dba_fetch($THREAD . '_next', $db);
+    $old_thread_prev = dba_fetch($THREAD . '_prev', $db);
+    dba_replace($old_thread_prev . '_next', $old_thread_next, $db);
+    dba_replace($old_thread_next . '_prev', $old_thread_prev, $db);
+
+    // Insert the replied-to thread at the head of the board
+    $old_head_next = dba_fetch($BOARD . '_head_next', $db);
     dba_replace($BOARD . '_head_next', $THREAD, $db);
-    dba_replace($THREAD . '_next', $old_board_head_next, $db);
+    dba_replace($THREAD . '_next', $old_head_next, $db);
     dba_replace($THREAD . '_prev', $BOARD . '_head', $db);
-    dba_replace($old_board_head_next . '_prev', $THREAD, $db);
+    dba_replace($old_head_next . '_prev', $THREAD, $db);
 
     // Get the ID for the new reply
     $current_id = strval(intval(dba_fetch('metadata_id', $db)) + 1);
@@ -126,13 +132,13 @@ if (!empty($NEW) && $_SERVER['REQUEST_METHOD'] == 'POST') {
     dba_replace($current_id . '_time', time(), $db);
 
     // Insert the reply at the tail of the thread replies
-    $old_replies_tail_prev = dba_fetch($THREAD . '_replies_tail_prev', $db);
+    $old_tail_prev = dba_fetch($THREAD . '_replies_tail_prev', $db);
     dba_replace($THREAD . '_replies_tail_prev', $current_id, $db);
     dba_replace($current_id . '_next', $THREAD . '_replies_tail', $db);
-    dba_replace($current_id . '_prev', $old_replies_tail_prev, $db);
-    dba_replace($old_replies_tail_prev . '_next', $current_id, $db);
+    dba_replace($current_id . '_prev', $old_tail_prev, $db);
+    dba_replace($old_tail_prev . '_next', $current_id, $db);
 
-    $redirect_to = '/' . $BOARD . '/' . $THREAD . '#reply' . $current_id;
+    $redirect_to = '/' . $BOARD . '/' . $THREAD;
     header('Location: ' . $redirect_to, true, 302);
     dba_close($db);
     exit(0);
@@ -176,13 +182,13 @@ if (http_response_code() != 200) { ?>
         <hgroup>
           <h1><?php echo $thread_subject; ?></h1>
           <h2>
-            <?php echo $thread_id; ?>
+            <a href="<?php echo $thread_id; ?>"><?php echo $thread_id; ?></a>
             <time><?php echo date('Y-m-d H:i', $thread_time); ?></time>
           </h2>
         </hgroup>
       </header>
       <main>
-        <p><?php echo $thread_message; ?></p>
+        <p><?php echo str_replace('&#13;&#10;', '<br>', $thread_message); ?></p>
       </main>
     </article>
 <?php // End of foreach thread loop
@@ -219,24 +225,71 @@ if (http_response_code() != 200) { ?>
   </header>
   <main>
 <?php
-$thread_id = $THREAD;
-$thread_subject = dba_fetch($thread_id . '_subject', $db);
-$thread_message = dba_fetch($thread_id . '_message', $db);
-$thread_time = dba_fetch($thread_id . '_time', $db); ?>
+  $thread_id = $THREAD;
+  $thread_subject = dba_fetch($thread_id . '_subject', $db);
+  $thread_message = dba_fetch($thread_id . '_message', $db);
+  $thread_time = dba_fetch($thread_id . '_time', $db); ?>
     <article id="thread<?php echo $thread_id; ?>">
       <header>
         <hgroup>
           <h1><?php echo $thread_subject; ?></h1>
           <h2>
-            <?php echo $thread_id; ?>
+            <a href="<?php echo $thread_id; ?>"><?php echo $thread_id; ?></a>
             <time><?php echo date('Y-m-d H:i', $thread_time); ?></time>
           </h2>
         </hgroup>
       </header>
       <main>
-        <p><?php echo $thread_message; ?></p>
+        <p><?php echo str_replace('\n', '<br>', $thread_message); ?></p>
+<?php
+  $reply_id = dba_fetch($THREAD . '_replies_head_next', $db);
+  while ($reply_id != $THREAD . '_replies_tail' && empty($NEW)) {
+    $reply_subject = dba_fetch($reply_id . '_subject', $db);
+    $reply_message = dba_fetch($reply_id . '_message', $db);
+    $reply_time = dba_fetch($reply_id . '_time', $db); ?>
+        <section>
+          <header>
+            <hgroup>
+              <h1><?php echo $reply_subject; ?></h1>
+              <h2>
+                <a href="#r<?php echo $reply_id; ?>"><?php echo $reply_id; ?></a>
+                <time><?php echo date('Y-m-d H:i', $reply_time); ?></time>
+              </h2>
+            </hgroup>
+          </header>
+          <main>
+            <p><?php echo $reply_message; ?></p>
+          </main>
+        </section>
+<?php
+    $reply_id = dba_fetch($reply_id . '_next', $db);
+  } ?>
       </main>
     </article>
+    <section id="newreply">
+      <header><h1>New Reply</h1></header>
+      <main>
+        <form method="post" action="/<?php echo $BOARD . '/' . $THREAD; ?>/new">
+<?php // If form wasn't filled-out right
+  if ($_SERVER['REQUEST_METHOD'] == 'POST'
+      && empty($_POST['lorem']) && empty($_POST['ipsum'])) { ?>
+          <p>You need a subject or message</p>
+<?php
+  } ?>
+          <p>
+            <label for="lorem">Subject</label>
+            <input type="text" name="lorem" autocomplete="off">
+          </p>
+          <p class="full">
+            <label for="ipsum">Message</label>
+            <textarea name="ipsum"></textarea>
+          </p>
+          <p>
+            <button>Submit</button>
+          </p>
+        </form>
+      </main>
+    </section>
 <?php
 }
 // Final db close

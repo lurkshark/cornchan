@@ -4,8 +4,8 @@ body {
 }
 
 article, section { border-top: #999 1px solid; }
-article h2 { font-size: 1em; font-weight: normal; color: #666; }
-article h2 time { font-weight: lighter; color: #ccc; }
+article h2 { font-size: 1em; font-weight: normal; }
+article h2 time { font-weight: lighter; color: #666; }
 article h1 { font-size: 1em; }
 footer { color: #666; }
 
