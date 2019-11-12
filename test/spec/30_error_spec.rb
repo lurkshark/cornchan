@@ -30,4 +30,13 @@ feature "Return error" do
       expect(page).to have_content("Error 404")
     end
   end
+
+  context "when a path for a mismatched thread is requested" do
+    # This test depends on thread_new_spec
+    # The correct board is actually /corn/
+    given(:path) { "/prog/10000" }
+    scenario "returns a 404" do
+      expect(page).to have_content("Error 404")
+    end
+  end
 end
