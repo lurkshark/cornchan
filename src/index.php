@@ -67,11 +67,8 @@ if ($PATH == $CANONICAL . '/' || $PATH . '/' == $CANONICAL) {
   dba_close($db);
   exit(0);
 } elseif ($PATH != $CANONICAL // Else if the path is nonsensical
-    // Or well-formatted but just for a thread that doesn't exist
-    || (!empty($THREAD) && !dba_exists($THREAD . '_subject', $db))
-    // Or well-formatted but just for a mismatched board/thread/reply
-    || (!empty($BOARD) && !empty($THREAD)
-      && dba_fetch($THREAD . '_board', $db) != $BOARD)) {
+    // Or well-formatted but for a thread that doesn't exist
+    || !post_exists($BOARD, $THREAD, $db)) {
   http_response_code(404);
 }
 
@@ -113,7 +110,8 @@ function insert_at_tail($tail_prefix, $id, $handle) {
 }
 
 // If posting a new thread or reply
-if (!empty($NEW) && $_SERVER['REQUEST_METHOD'] == 'POST') {
+if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
+    && $_SERVER['REQUEST_METHOD'] == 'POST') {
   // If new thread: POST /board/new
   if (!empty($BOARD) && empty($THREAD)
       && !empty($_POST['lorem'])) {
