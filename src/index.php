@@ -17,6 +17,7 @@ if (!file_exists($DBA_PATH)) {
   dba_replace('metadata_id', '9999', $db);
   dba_replace('metadata_name', 'cornchan', $db);
   dba_replace('metadata_boards', json_encode($boards), $db);
+  dba_replace('metadata_secret', bin2hex(random_bytes(32)), $db);
   foreach ($boards as $board) {
     dba_replace($board . '_head_next', $board . '_tail', $db);
     dba_replace($board . '_tail_prev', $board . '_head', $db);
@@ -72,7 +73,25 @@ if ($PATH == $CANONICAL . '/' || $PATH . '/' == $CANONICAL) {
   http_response_code(404);
 }
 
-// Utility functions for adding posts
+// Returns a HMAC token
+function generate_token($tag, $handler) {
+  $time = time(); // Signing time for the token
+  $secret = dba_fetch('metadata_secret', $handler);
+  $hmac = hash_hmac('sha256', implode('.', [$tag, $time]), $secret);
+  return implode('.', [$time, $hmac]);
+}
+
+// Verifies a HMAC token from generate_token
+function verify_token($tag, $token, $handler) {
+  [$time, $hmac] = explode('.', $token);
+  if (time() - intval($time) > 3600) {
+    return false;
+  }
+  // Verify the hmac because timestamp is good
+  $secret = dba_fetch('metadata_secret', $handler);
+  return hash_hmac('sha256', implode('.', [$tag, $time]),
+      $secret) == $hmac;
+}
 
 // Gets and increment ID
 function fresh_id($handle) {
@@ -111,7 +130,8 @@ function insert_at_tail($tail_prefix, $id, $handle) {
 
 // If posting a new thread or reply
 if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
-    && $_SERVER['REQUEST_METHOD'] == 'POST') {
+    && $_SERVER['REQUEST_METHOD'] == 'POST'
+    && verify_token('csrf', $_POST['sit'], $db)) {
   // If new thread: POST /board/new
   if (!empty($BOARD) && empty($THREAD)
       && !empty($_POST['lorem'])) {
@@ -165,8 +185,8 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
   <link rel="icon" href="/static/favicon.png">
   <meta name="theme-color" content="#666">
   <style type="text/css">
-    <?php include('static/normalize.css'); ?>
-    <?php include('static/style.css'); ?>
+<?php include('static/normalize.css'); ?>
+<?php include('static/style.css'); ?>
   </style>
 </head>
 <body>
@@ -207,32 +227,7 @@ if (http_response_code() != 200) { ?>
     </article>
 <?php // End of foreach thread loop
     $thread_id = dba_fetch($thread_id . '_next', $db);
-  } ?>
-    <section id="newthread">
-      <header><h1>New Thread</h1></header>
-      <main>
-        <form method="post" action="/<?php echo $BOARD; ?>/new">
-<?php // If form wasn't filled-out right
-  if ($_SERVER['REQUEST_METHOD'] == 'POST' && empty($_POST['lorem'])) { ?>
-          <p>You need a subject</p>
-<?php
-  } ?>
-          <p>
-            <label for="lorem">Subject</label>
-            <input type="text" name="lorem" autocomplete="off">
-          </p>
-          <p class="full">
-            <label for="ipsum">Message</label>
-            <textarea name="ipsum"></textarea>
-          </p>
-          <p>
-            <button>Submit</button>
-          </p>
-        </form>
-      </main>
-    </section>
-  </main>
-<?php
+  }
 } elseif (!empty($BOARD) && !empty($THREAD)) { ?>
   <header>
     <h1>/<?php echo $BOARD; ?>/<?php echo $THREAD; ?></h1>
@@ -280,15 +275,30 @@ if (http_response_code() != 200) { ?>
   } ?>
       </main>
     </article>
+<?php // End main body
+} // Start new thread/reply form
+if (!empty($BOARD)) {
+  if (!empty($BOARD) && empty($THREAD)) { ?>
+    <section id="newthread">
+      <header><h1>New Thread</h1></header>
+      <main>
+        <form method="post" action="/<?php echo $BOARD; ?>/new">
+<?php // If form wasn't filled-out right
+    if ($_SERVER['REQUEST_METHOD'] == 'POST' && empty($_POST['lorem'])) { ?>
+          <p>You need a subject</p>
+<?php
+    }
+  } elseif (!empty($BOARD) && !empty($THREAD)) { ?>
     <section id="newreply">
       <header><h1>New Reply</h1></header>
       <main>
         <form method="post" action="/<?php echo $BOARD . '/' . $THREAD; ?>/new">
 <?php // If form wasn't filled-out right
-  if ($_SERVER['REQUEST_METHOD'] == 'POST'
+    if ($_SERVER['REQUEST_METHOD'] == 'POST'
       && empty($_POST['lorem']) && empty($_POST['ipsum'])) { ?>
           <p>You need a subject or message</p>
 <?php
+    }
   } ?>
           <p>
             <label for="lorem">Subject</label>
@@ -301,9 +311,13 @@ if (http_response_code() != 200) { ?>
           <p>
             <button>Submit</button>
           </p>
+<?php // Generate CSRF token
+  $csrf_token = generate_token('csrf', $db); ?>
+          <input type="hidden" name="sit" value="<?php echo $csrf_token; ?>">
         </form>
       </main>
     </section>
+  </main><!-- This main is only on boards and threads -->
 <?php
 }
 // Final db close
