@@ -1,6 +1,7 @@
 feature "Posting a new reply to a thread" do
   given(:subject) { Array.new(5) { CORPUS.sample }.join(" ") }
   given(:message) { Array.new(64) { CORPUS.sample }.join(" ") }
+  given(:captcha) { "TEST" }
 
   background do
     visit "/corn/10000/new"
@@ -11,6 +12,7 @@ feature "Posting a new reply to a thread" do
       within("#newreply") do
         fill_in "lorem", with: subject
         fill_in "ipsum", with: message
+        fill_in "amet", with: captcha
         click_button "Submit"
       end
     end
@@ -19,6 +21,22 @@ feature "Posting a new reply to a thread" do
       expect(page).to have_current_path("/corn/10000")
       expect(page).to have_content(subject)
       expect(page).to have_content(message)
+    end
+  end
+
+  context "when the form is filled-out with a bad captcha" do
+    background do
+      within("#newreply") do
+        fill_in "lorem", with: subject
+        fill_in "ipsum", with: message
+        fill_in "amet", with: "GARBAGE"
+        click_button "Submit"
+      end
+    end
+
+    scenario "stays on the new thread page and shows an error" do
+      expect(page).to have_current_path("/corn/10000/new")
+      expect(page).to have_content("You got the CAPTCHA wrong")
     end
   end
 
@@ -39,6 +57,7 @@ feature "Posting a new reply to a thread" do
     background do
       within("#newreply") do
         fill_in "ipsum", with: message
+        fill_in "amet", with: captcha
         click_button "Submit"
       end
     end
@@ -53,6 +72,7 @@ feature "Posting a new reply to a thread" do
     background do
       within("#newreply") do
         fill_in "lorem", with: subject
+        fill_in "amet", with: captcha
         click_button "Submit"
       end
     end

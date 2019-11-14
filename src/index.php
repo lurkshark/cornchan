@@ -7,6 +7,7 @@ in_array('lmdb', dba_handlers())
 $DBA_HANDLER = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'gdbm';
 // Use the override when provided (e.g. Travis CI) otherwise use HOME dir
 $DBA_PATH = ($_ENV['CORN_DBA_PATH_OVERRIDE'] ?? $_ENV['HOME']) . 'cornchan.db';
+$TEST_OVERRIDE = isset($_ENV['CORN_TEST_OVERRIDE']);
 
 // Create the db if it doesn't exist
 if (!file_exists($DBA_PATH)) {
@@ -131,7 +132,9 @@ function insert_at_tail($tail_prefix, $id, $handle) {
 // If posting a new thread or reply
 if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
     && $_SERVER['REQUEST_METHOD'] == 'POST'
-    && verify_token('csrf', $_POST['sit'], $db)) {
+    && verify_token('csrf', $_POST['sit'], $db)
+    && (verify_token($_POST['amet'], $_POST['captcha'], $db)
+      || ($TEST_OVERRIDE && $_POST['amet'] == 'TEST'))) {
   // If new thread: POST /board/new
   if (!empty($BOARD) && empty($THREAD)
       && !empty($_POST['lorem'])) {
@@ -177,14 +180,14 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
   }
 } ?>
 <!DOCTYPE html>
-<html>
+<html lang="x-corn">
 <head>
   <title><?php echo $NAME; ?></title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="/static/favicon.png">
   <meta name="theme-color" content="#666">
-  <style type="text/css">
+  <style>
 <?php include('static/normalize.css'); ?>
 <?php include('static/style.css'); ?>
   </style>
@@ -214,16 +217,16 @@ if (http_response_code() != 200) { ?>
     <article id="thread<?php echo $thread_id; ?>">
       <header>
         <hgroup>
-          <h1><?php echo $thread_subject; ?></h1>
-          <h2>
+          <h2><?php echo $thread_subject; ?></h2>
+          <h3>
             <a href="<?php echo $thread_id; ?>"><?php echo $thread_id; ?></a>
             <time><?php echo date('Y-m-d H:i', $thread_time); ?></time>
-          </h2>
+          </h3>
         </hgroup>
       </header>
-      <main>
+      <div>
         <p><?php echo str_replace('&#13;&#10;', '<br>', $thread_message); ?></p>
-      </main>
+      </div>
     </article>
 <?php // End of foreach thread loop
     $thread_id = dba_fetch($thread_id . '_next', $db);
@@ -241,14 +244,14 @@ if (http_response_code() != 200) { ?>
     <article id="thread<?php echo $thread_id; ?>">
       <header>
         <hgroup>
-          <h1><?php echo $thread_subject; ?></h1>
-          <h2>
+          <h2><?php echo $thread_subject; ?></h2>
+          <h3>
             <a href="<?php echo $thread_id; ?>"><?php echo $thread_id; ?></a>
             <time><?php echo date('Y-m-d H:i', $thread_time); ?></time>
-          </h2>
+          </h3>
         </hgroup>
       </header>
-      <main>
+      <div>
         <p><?php echo str_replace('&#13;&#10;', '<br>', $thread_message); ?></p>
 <?php
   $reply_id = dba_fetch($THREAD . '_replies_head_next', $db);
@@ -259,63 +262,104 @@ if (http_response_code() != 200) { ?>
         <section>
           <header>
             <hgroup>
-              <h1><?php echo $reply_subject; ?></h1>
-              <h2>
+              <h2><?php echo $reply_subject; ?></h2>
+              <h3>
                 <a href="#r<?php echo $reply_id; ?>"><?php echo $reply_id; ?></a>
                 <time><?php echo date('Y-m-d H:i', $reply_time); ?></time>
-              </h2>
+              </h3>
             </hgroup>
           </header>
-          <main>
+          <div>
             <p><?php echo str_replace('&#13;&#10;', '<br>', $reply_message); ?></p>
-          </main>
+          </div>
         </section>
 <?php
     $reply_id = dba_fetch($reply_id . '_next', $db);
   } ?>
-      </main>
+      </div>
     </article>
 <?php // End main body
 } // Start new thread/reply form
 if (!empty($BOARD)) {
   if (!empty($BOARD) && empty($THREAD)) { ?>
     <section id="newthread">
-      <header><h1>New Thread</h1></header>
-      <main>
+      <header><h2>New Thread</h2></header>
+      <div>
         <form method="post" action="/<?php echo $BOARD; ?>/new">
 <?php // If form wasn't filled-out right
     if ($_SERVER['REQUEST_METHOD'] == 'POST' && empty($_POST['lorem'])) { ?>
-          <p>You need a subject</p>
+          <p>You need a subject</p><p></p>
+<?php
+    } elseif ($_SERVER['REQUEST_METHOD'] == 'POST'
+        && (!verify_token($_POST['amet'], $_POST['captcha'], $db)
+          || ($TEST_OVERRIDE && $_POST['amet'] != 'TEST'))) { ?>
+          <p>You got the CAPTCHA wrong</p><p></p>
 <?php
     }
   } elseif (!empty($BOARD) && !empty($THREAD)) { ?>
     <section id="newreply">
-      <header><h1>New Reply</h1></header>
-      <main>
+      <header><h2>New Reply</h2></header>
+      <div>
         <form method="post" action="/<?php echo $BOARD . '/' . $THREAD; ?>/new">
 <?php // If form wasn't filled-out right
     if ($_SERVER['REQUEST_METHOD'] == 'POST'
-      && empty($_POST['lorem']) && empty($_POST['ipsum'])) { ?>
-          <p>You need a subject or message</p>
+        && empty($_POST['lorem']) && empty($_POST['ipsum'])) { ?>
+          <p>You need a subject or message</p><p></p>
+<?php
+    } elseif ($_SERVER['REQUEST_METHOD'] == 'POST'
+        && (!verify_token($_POST['amet'], $_POST['captcha'], $db)
+          || ($TEST_OVERRIDE && $_POST['amet'] != 'TEST'))) { ?>
+          <p>You got the CAPTCHA wrong</p><p></p>
 <?php
     }
   } ?>
           <p>
             <label for="lorem">Subject</label>
-            <input type="text" name="lorem" autocomplete="off">
+            <input type="text" name="lorem" id="lorem" autocomplete="off">
+          </p>
+          <p>
+            <!-- <label for="dolor">Upload</label> -->
+            <!-- <input type="file" name="dolor" id="dolor"> -->
           </p>
           <p class="full">
             <label for="ipsum">Message</label>
-            <textarea name="ipsum"></textarea>
+            <textarea name="ipsum" id="ipsum"></textarea>
           </p>
+<?php // Generate CSRF token
+  $captcha = imagecreate(80, 20);
+  imagecolorallocate($captcha, 255, 255, 255);
+
+  $answer = array();
+  $alphabet = range('A', 'Z');
+  while (sizeof($answer) < 6) {
+    $answer[] = $alphabet[random_int(0, sizeof($alphabet) - 1)];
+  }
+
+  $red = imagecolorallocate($captcha, 192, 64, 64);
+  imagestring($captcha, 5, 5, 2, implode($answer), $red);
+
+  ob_start();
+  imagepng($captcha, NULL, 9);
+  $bin = ob_get_clean();
+  imagedestroy($captcha);
+  $image_data = base64_encode($bin);
+  $captcha_token = generate_token(implode($answer), $db);
+  $csrf_token = generate_token('csrf', $db); ?>
+          <p>
+            <label for="amet">CAPTCHA</label>
+            <!-- <input type="checkbox" name="cookie" id="opt-in-cookie" checked> -->
+            <!-- <label for="opt-in-cookie">Use cookie to remember</label> -->
+            <input type="text" name="amet" id="amet" autocomplete="off"
+              style="background: url(data:image/png;base64,<?php echo $image_data; ?>) right no-repeat;">
+          </p>
+          <p></p>
           <p>
             <button>Submit</button>
           </p>
-<?php // Generate CSRF token
-  $csrf_token = generate_token('csrf', $db); ?>
+          <input type="hidden" name="captcha" value="<?php echo $captcha_token; ?>">
           <input type="hidden" name="sit" value="<?php echo $csrf_token; ?>">
         </form>
-      </main>
+      </div>
     </section>
   </main><!-- This main is only on boards and threads -->
 <?php

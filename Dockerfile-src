@@ -2,8 +2,12 @@ FROM php:7.3-apache
 # Dependencies for dba extension
 RUN apt-get update && apt-get install -y \
     liblmdb-dev \
+    libpng-dev \
   && docker-php-ext-configure dba --enable-dba --with-lmdb \
-  && docker-php-ext-install dba \
+  && docker-php-ext-configure gd --with-gd \
+      --with-png-dir=/usr/include \
+  && docker-php-ext-install dba gd \
   && a2enmod rewrite
 # Override for Travis CI build
 ENV CORN_DBA_PATH_OVERRIDE /tmp/
+ENV CORN_TEST_OVERRIDE true
