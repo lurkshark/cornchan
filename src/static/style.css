@@ -22,6 +22,7 @@ input[type=checkbox] { width: inherit; }
 textarea { height: 200px; }
 button { width: 90%; }
 
+#captcha-answer { text-transform: uppercase; }
 label[for=opt-in-cookie] {
   font-size: smaller;
   font-weight: lighter;

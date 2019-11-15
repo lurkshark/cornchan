@@ -12,7 +12,7 @@ feature "Posting a new reply to a thread" do
       within("#newreply") do
         fill_in "lorem", with: subject
         fill_in "ipsum", with: message
-        fill_in "amet", with: captcha
+        fill_in "captcha-answer", with: captcha
         click_button "Submit"
       end
     end
@@ -29,7 +29,7 @@ feature "Posting a new reply to a thread" do
       within("#newreply") do
         fill_in "lorem", with: subject
         fill_in "ipsum", with: message
-        fill_in "amet", with: "GARBAGE"
+        fill_in "captcha-answer", with: "GARBAGE"
         click_button "Submit"
       end
     end
@@ -57,7 +57,7 @@ feature "Posting a new reply to a thread" do
     background do
       within("#newreply") do
         fill_in "ipsum", with: message
-        fill_in "amet", with: captcha
+        fill_in "captcha-answer", with: captcha
         click_button "Submit"
       end
     end
@@ -72,7 +72,7 @@ feature "Posting a new reply to a thread" do
     background do
       within("#newreply") do
         fill_in "lorem", with: subject
-        fill_in "amet", with: captcha
+        fill_in "captcha-answer", with: captcha
         click_button "Submit"
       end
     end
@@ -80,6 +80,38 @@ feature "Posting a new reply to a thread" do
     scenario "redirects to the thread and shows the new subject-only post" do
       expect(page).to have_current_path("/corn/10000")
       expect(page).to have_content(subject)
+    end
+  end
+
+  context "when the captcha cookie opt-in is checked" do
+    background do
+      within("#newreply") do
+        fill_in "lorem", with: subject
+        fill_in "captcha-answer", with: captcha
+        check "opt-in-cookie"
+        click_button "Submit"
+      end
+    end
+
+    scenario "redirects to the board and doesn't prompt for a CAPTCHA" do
+      expect(page).to have_current_path("/corn/10000")
+      expect(page).to_not have_content("CAPTCHA")
+    end
+  end
+
+  context "when the captcha cookie opt-in is unchecked" do
+    background do
+      within("#newreply") do
+        fill_in "lorem", with: subject
+        fill_in "captcha-answer", with: captcha
+        uncheck "opt-in-cookie"
+        click_button "Submit"
+      end
+    end
+
+    scenario "redirects to the board and prompts for a CAPTCHA" do
+      expect(page).to have_current_path("/corn/10000")
+      expect(page).to have_content("CAPTCHA")
     end
   end
 end
