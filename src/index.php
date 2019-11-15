@@ -207,7 +207,7 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
 </head>
 <body>
   <nav>
-    <a href="/"><?php echo $NAME; ?></a>
+    <a href="/" style="font-weight: bold;"><?php echo $NAME; ?></a>
 <?php
 foreach ($BOARDS as $board) {
   $board_path = '/' . $board . '/'; ?>
