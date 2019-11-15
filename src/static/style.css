@@ -2,6 +2,19 @@ body {
   padding: 15px;
 }
 
+nav {
+  overflow: hidden;
+  background-color: #eee;
+}
+
+nav a {
+  float: left;
+  color: #000;
+  text-align: center;
+  text-decoration: none;
+  padding: 0.25em 0.5em;
+}
+
 article, section { border-top: #999 1px solid; }
 article h3 { font-size: 1em; font-weight: normal; }
 article h3 time { font-weight: lighter; color: #666; }

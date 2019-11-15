@@ -206,6 +206,15 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
   </style>
 </head>
 <body>
+  <nav>
+    <a href="/"><?php echo $NAME; ?></a>
+<?php
+foreach ($BOARDS as $board) {
+  $board_path = '/' . $board . '/'; ?>
+    <a href="<?php echo $board_path; ?>"><?php echo $board_path; ?></a>
+<?php // End foreach board
+} ?>
+  </nav>
 <?php // Check for error status code
 if (http_response_code() != 200) { ?>
   <h1>Error <?php echo http_response_code(); ?></h1>
