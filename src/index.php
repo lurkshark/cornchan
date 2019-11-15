@@ -129,12 +129,25 @@ function insert_at_tail($tail_prefix, $id, $handle) {
   dba_replace($old_tail_prev . '_next', $id, $handle);
 }
 
+// Get the CAPTCHA status
+$captcha_answer = strtoupper($_POST['captcha-answer']);
+$captcha_cookie = explode('.', $_COOKIE['captcha']);
+$captcha_cookie_token = implode('.', array_slice($captcha_cookie, 1));
+$captcha_skip = !empty($_COOKIE['captcha'])
+    && (verify_token($captcha_cookie[0], $captcha_cookie_token, $db)
+      || ($TEST_OVERRIDE && $captcha_cookie[0] == 'TEST'));
+
 // If posting a new thread or reply
 if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
     && $_SERVER['REQUEST_METHOD'] == 'POST'
-    && verify_token('csrf', $_POST['sit'], $db)
-    && (verify_token($_POST['amet'], $_POST['captcha'], $db)
-      || ($TEST_OVERRIDE && $_POST['amet'] == 'TEST'))) {
+    && verify_token('csrf', $_POST['csrf-token'], $db)
+    && (verify_token($captcha_answer, $_POST['captcha-token'], $db)
+      || ($TEST_OVERRIDE && $captcha_answer == 'TEST')
+      || $captcha_skip)) {
+  // If opt-in to CAPTCHA cookie
+  if ($_POST['opt-in-cookie'] && !$captcha_skip) {
+    setcookie('captcha', implode('.', [$captcha_answer, $_POST['captcha-token']]));
+  }
   // If new thread: POST /board/new
   if (!empty($BOARD) && empty($THREAD)
       && !empty($_POST['lorem'])) {
@@ -180,7 +193,7 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
   }
 } ?>
 <!DOCTYPE html>
-<html lang="x-corn">
+<html lang="en">
 <head>
   <title><?php echo $NAME; ?></title>
   <meta charset="utf-8">
@@ -291,8 +304,8 @@ if (!empty($BOARD)) {
           <p>You need a subject</p><p></p>
 <?php
     } elseif ($_SERVER['REQUEST_METHOD'] == 'POST'
-        && (!verify_token($_POST['amet'], $_POST['captcha'], $db)
-          || ($TEST_OVERRIDE && $_POST['amet'] != 'TEST'))) { ?>
+        && (!verify_token($_POST['captcha-answer'], $_POST['captcha-token'], $db)
+          || ($TEST_OVERRIDE && $_POST['captcha-answer'] != 'TEST'))) { ?>
           <p>You got the CAPTCHA wrong</p><p></p>
 <?php
     }
@@ -307,8 +320,8 @@ if (!empty($BOARD)) {
           <p>You need a subject or message</p><p></p>
 <?php
     } elseif ($_SERVER['REQUEST_METHOD'] == 'POST'
-        && (!verify_token($_POST['amet'], $_POST['captcha'], $db)
-          || ($TEST_OVERRIDE && $_POST['amet'] != 'TEST'))) { ?>
+        && (!verify_token($_POST['captcha-answer'], $_POST['captcha-token'], $db)
+          || ($TEST_OVERRIDE && $_POST['captcha-answer'] != 'TEST'))) { ?>
           <p>You got the CAPTCHA wrong</p><p></p>
 <?php
     }
@@ -325,39 +338,43 @@ if (!empty($BOARD)) {
             <label for="ipsum">Message</label>
             <textarea name="ipsum" id="ipsum"></textarea>
           </p>
-<?php // Generate CSRF token
-  $captcha = imagecreate(80, 20);
-  imagecolorallocate($captcha, 255, 255, 255);
+<?php // Generate CAPTCHA if no cookie
+  if (!$captcha_skip) {
+    $captcha = imagecreate(80, 20);
+    imagecolorallocate($captcha, 255, 255, 255);
 
-  $answer = array();
-  $alphabet = range('A', 'Z');
-  while (sizeof($answer) < 6) {
-    $answer[] = $alphabet[random_int(0, sizeof($alphabet) - 1)];
-  }
+    $answer = array();
+    $alphabet = range('A', 'Z');
+    while (sizeof($answer) < 6) {
+      $answer[] = $alphabet[random_int(0, sizeof($alphabet) - 1)];
+    }
 
-  $red = imagecolorallocate($captcha, 192, 64, 64);
-  imagestring($captcha, 5, 5, 2, implode($answer), $red);
+    $red = imagecolorallocate($captcha, 192, 64, 64);
+    imagestring($captcha, 5, 5, 2, implode($answer), $red);
 
-  ob_start();
-  imagepng($captcha, NULL, 9);
-  $bin = ob_get_clean();
-  imagedestroy($captcha);
-  $image_data = base64_encode($bin);
-  $captcha_token = generate_token(implode($answer), $db);
-  $csrf_token = generate_token('csrf', $db); ?>
+    ob_start();
+    imagepng($captcha, NULL, 9);
+    $bin = ob_get_clean();
+    imagedestroy($captcha);
+    $image_data = base64_encode($bin);
+    $captcha_token = generate_token(implode($answer), $db); ?>
           <p>
-            <label for="amet">CAPTCHA</label>
-            <!-- <input type="checkbox" name="cookie" id="opt-in-cookie" checked> -->
-            <!-- <label for="opt-in-cookie">Use cookie to remember</label> -->
-            <input type="text" name="amet" id="amet" autocomplete="off"
+            <label for="captcha-answer">CAPTCHA</label>
+            <input type="checkbox" name="opt-in-cookie" id="opt-in-cookie" checked>
+            <label for="opt-in-cookie">Use cookie to remember</label>
+            <input type="text" name="captcha-answer" id="captcha-answer" autocomplete="off"
               style="background: url(data:image/png;base64,<?php echo $image_data; ?>) right no-repeat;">
+            <input type="hidden" name="captcha-token" value="<?php echo $captcha_token; ?>">
           </p>
           <p></p>
+<?php // End CAPTCHA if no cookie
+  } ?>
           <p>
             <button>Submit</button>
           </p>
-          <input type="hidden" name="captcha" value="<?php echo $captcha_token; ?>">
-          <input type="hidden" name="sit" value="<?php echo $csrf_token; ?>">
+<?php // Generate CSRF token
+  $csrf_token = generate_token('csrf', $db); ?>
+          <input type="hidden" name="csrf-token" value="<?php echo $csrf_token; ?>">
         </form>
       </div>
     </section>
