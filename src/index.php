@@ -206,16 +206,21 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
   </style>
 </head>
 <body>
+  <nav>
+    <a href="/" style="font-weight: bold;"><?php echo $NAME; ?></a>
+<?php
+foreach ($BOARDS as $board) {
+  $board_path = '/' . $board . '/'; ?>
+    <a href="<?php echo $board_path; ?>"><?php echo $board_path; ?></a>
+<?php // End foreach board
+} ?>
+  </nav>
 <?php // Check for error status code
 if (http_response_code() != 200) { ?>
   <h1>Error <?php echo http_response_code(); ?></h1>
 <?php // If at root path
 } elseif (empty($BOARD) && empty($THREAD)) {
-  foreach ($BOARDS as $board) {
-    $board_path = '/' . $board . '/'; ?>
-  <p><a href="<?php echo $board_path; ?>"><?php echo $board_path; ?></a></p>
-<?php // End foreach board
-  }
+  // Something novel for the root path
 } elseif (!empty($BOARD) && empty($THREAD)) { ?>
   <header>
     <h1>/<?php echo $BOARD; ?>/</h1>
