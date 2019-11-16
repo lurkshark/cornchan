@@ -135,14 +135,14 @@ $captcha_cookie = explode('.', $_COOKIE['captcha']);
 $captcha_cookie_token = implode('.', array_slice($captcha_cookie, 1));
 $captcha_skip = !empty($_COOKIE['captcha'])
     && (verify_token($captcha_cookie[0], $captcha_cookie_token, $db)
-      || ($TEST_OVERRIDE && $captcha_cookie[0] == 'TEST'));
+      || ($TEST_OVERRIDE && $captcha_cookie[0] == 'GOODCAPTCHA'));
 
 // If posting a new thread or reply
 if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
     && $_SERVER['REQUEST_METHOD'] == 'POST'
     && verify_token('csrf', $_POST['csrf-token'], $db)
     && (verify_token($captcha_answer, $_POST['captcha-token'], $db)
-      || ($TEST_OVERRIDE && $captcha_answer == 'TEST')
+      || ($TEST_OVERRIDE && $captcha_answer == 'GOODCAPTCHA')
       || $captcha_skip)) {
   // If opt-in to CAPTCHA cookie
   if ($_POST['opt-in-cookie'] && !$captcha_skip) {
@@ -310,7 +310,7 @@ if (!empty($BOARD)) {
 <?php
     } elseif ($_SERVER['REQUEST_METHOD'] == 'POST'
         && (!verify_token($_POST['captcha-answer'], $_POST['captcha-token'], $db)
-          || ($TEST_OVERRIDE && $_POST['captcha-answer'] != 'TEST'))) { ?>
+          || ($TEST_OVERRIDE && $_POST['captcha-answer'] != 'GOODCAPTCHA'))) { ?>
           <p>You got the CAPTCHA wrong</p><p></p>
 <?php
     }
@@ -326,7 +326,7 @@ if (!empty($BOARD)) {
 <?php
     } elseif ($_SERVER['REQUEST_METHOD'] == 'POST'
         && (!verify_token($_POST['captcha-answer'], $_POST['captcha-token'], $db)
-          || ($TEST_OVERRIDE && $_POST['captcha-answer'] != 'TEST'))) { ?>
+          || ($TEST_OVERRIDE && $_POST['captcha-answer'] != 'GOODCAPTCHA'))) { ?>
           <p>You got the CAPTCHA wrong</p><p></p>
 <?php
     }
@@ -363,7 +363,7 @@ if (!empty($BOARD)) {
     imagedestroy($captcha);
     $image_data = base64_encode($bin);
     $captcha_token = generate_token(implode($answer), $db); ?>
-          <p>
+          <p class="full">
             <label for="captcha-answer">CAPTCHA</label>
             <input type="checkbox" name="opt-in-cookie" id="opt-in-cookie" checked>
             <label for="opt-in-cookie">Use cookie to remember</label>
@@ -371,7 +371,6 @@ if (!empty($BOARD)) {
               style="background: url(data:image/png;base64,<?php echo $image_data; ?>) right no-repeat;">
             <input type="hidden" name="captcha-token" value="<?php echo $captcha_token; ?>">
           </p>
-          <p></p>
 <?php // End CAPTCHA if no cookie
   } ?>
           <p>
