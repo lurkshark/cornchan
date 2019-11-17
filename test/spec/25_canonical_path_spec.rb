@@ -13,4 +13,9 @@ feature "Trailing slash redirects" do
     visit "/corn/new/"
     expect(page).to have_current_path("/corn/new")
   end
+
+  scenario "thread path with reply post ID redirects to thread" do
+    visit "/corn/10005"
+    expect(page).to have_current_path("/corn/10000")
+  end
 end

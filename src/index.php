@@ -14,7 +14,7 @@ if (!file_exists($DBA_PATH)) {
   $db = dba_open($DBA_PATH, 'c', $DBA_HANDLER)
     or exit('Can\'t initialize a new db file!');
 
-  $boards = ['corn', 'prog', 'news'];
+  $boards = ['corn', 'meta', 'news'];
   dba_replace('metadata_id', '9999', $db);
   dba_replace('metadata_name', 'cornchan', $db);
   dba_replace('metadata_boards', json_encode($boards), $db);
@@ -35,28 +35,28 @@ $db = dba_open($DBA_PATH, 'r', $DBA_HANDLER)
 $NAME = dba_fetch('metadata_name', $db);
 $BOARDS = json_decode(dba_fetch('metadata_boards', $db));
 $PATH = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-preg_match('/^(?:\/(' . join('|', $BOARDS) . '))?(?:\/(\d+))?(?:\/(new))?\/?$/',
+preg_match('/^(?:\/(' . join('|', $BOARDS) . '))?(?:\/(\d+))?(?:\/(new|delete))?\/?$/',
     $PATH, $matches);
 $BOARD = $matches[1];
-$THREAD = $matches[2];
-$NEW = $matches[3];
+$POST_ID = $matches[2];
+$ACTION = $matches[3];
 
 $CANONICAL = '/'; // Build expected path
 empty($BOARD)   or $CANONICAL .= $BOARD;
-empty($THREAD)  or $CANONICAL .= '/' . $THREAD;
-empty($NEW)     or $CANONICAL .= '/' . $NEW;
-if (!empty($BOARD) && empty($THREAD) && empty($NEW)) {
+empty($POST_ID)  or $CANONICAL .= '/' . $POST_ID;
+empty($ACTION)  or $CANONICAL .= '/' . $ACTION;
+if (!empty($BOARD) && empty($POST_ID) && empty($ACTION)) {
   $CANONICAL .= '/';
 }
 
 // Utility function for validating posts
-function post_exists($board, $thread, $handler) {
-  // If this thread just doesn't exist
-  if (!empty($thread) && !dba_exists($thread . '_subject', $handler)) {
+function post_exists($board, $post_id, $handler) {
+  // If this post_id just doesn't exist
+  if (!empty($post_id) && !dba_exists($post_id . '_subject', $handler)) {
     return false;
-  // Or if this thread exists but it's for a different board
-  } elseif (!empty($board) && !empty($thread)
-      && dba_fetch($thread . '_board', $handler) != $board) {
+  // Or if this post_id exists but it's for a different board
+  } elseif (!empty($board) && !empty($post_id)
+      && dba_fetch($post_id . '_board', $handler) != $board) {
     return false;
   }
   // Otherwise it's OK
@@ -69,9 +69,19 @@ if ($PATH == $CANONICAL . '/' || $PATH . '/' == $CANONICAL) {
   dba_close($db);
   exit(0);
 } elseif ($PATH != $CANONICAL // Else if the path is nonsensical
-    // Or well-formatted but for a thread that doesn't exist
-    || !post_exists($BOARD, $THREAD, $db)) {
+    // Or well-formatted but for a post that doesn't exist
+    || !post_exists($BOARD, $POST_ID, $db)) {
   http_response_code(404);
+}
+
+// If trying to view a specific reply then redirect to the thread
+if (!empty($POST_ID) && $ACTION != 'delete' && post_exists($BOARD, $POST_ID, $db)
+    && dba_fetch($POST_ID . '_thread', $db) != $POST_ID) {
+  $thread_id = dba_fetch($POST_ID . '_thread', $db);
+  $redirect_to = '/' . $BOARD . '/' . $thread_id . '#reply' . $POST_ID;
+  header('Location: ' . $redirect_to, true, 302);
+  dba_close($db);
+  exit(0);
 }
 
 // Returns a HMAC token
@@ -102,11 +112,12 @@ function fresh_id($handle) {
 }
 
 // Upserts the post for the given ID
-function update_post($id, $board, $subject, $message, $handle) {
+function update_post($id, $board, $thread, $subject, $message, $handle) {
   $subject = filter_var($subject, FILTER_SANITIZE_SPECIAL_CHARS);
   $message = filter_var($message, FILTER_SANITIZE_SPECIAL_CHARS);
   dba_replace($id . '_subject', substr($subject, 0, 64), $handle);
   dba_replace($id . '_message', substr($message, 0, 4096), $handle);
+  dba_replace($id . '_thread', $thread, $handle);
   dba_replace($id . '_board', $board, $handle);
   dba_replace($id . '_time', time(), $handle);
 }
@@ -138,7 +149,7 @@ $captcha_skip = !empty($_COOKIE['captcha'])
       || ($TEST_OVERRIDE && $captcha_cookie[0] == 'GOODCAPTCHA'));
 
 // If posting a new thread or reply
-if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
+if (post_exists($BOARD, $POST_ID, $db) && !empty($ACTION)
     && $_SERVER['REQUEST_METHOD'] == 'POST'
     && verify_token('csrf', $_POST['csrf-token'], $db)
     && (verify_token($captcha_answer, $_POST['captcha-token'], $db)
@@ -146,10 +157,10 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
       || $captcha_skip)) {
   // If opt-in to CAPTCHA cookie
   if ($_POST['opt-in-cookie'] && !$captcha_skip) {
-    setcookie('captcha', implode('.', [$captcha_answer, $_POST['captcha-token']]));
+    setcookie('captcha', implode('.', [$captcha_answer, $_POST['captcha-token']]), 0, '/');
   }
   // If new thread: POST /board/new
-  if (!empty($BOARD) && empty($THREAD)
+  if (!empty($BOARD) && empty($POST_ID)
       && !empty($_POST['lorem'])) {
     dba_close($db); // Close the db for reads and reopen for writes
     $db = dba_open($DBA_PATH, 'w', $DBA_HANDLER);
@@ -158,7 +169,7 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
     // Insert the new thread at the head of the board
     insert_at_head($BOARD, $new_thread_id, $db);
     // Create the post for the new thread
-    update_post($new_thread_id, $BOARD, $_POST['lorem'], $_POST['ipsum'], $db);
+    update_post($new_thread_id, $BOARD, $new_thread_id, $_POST['lorem'], $_POST['ipsum'], $db);
     // Initialize thread replies pointers
     dba_replace($new_thread_id . '_replies_head_next', $new_thread_id . '_replies_tail', $db);
     dba_replace($new_thread_id . '_replies_tail_prev', $new_thread_id . '_replies_head', $db);
@@ -168,25 +179,25 @@ if (post_exists($BOARD, $THREAD, $db) && !empty($NEW)
     dba_close($db);
     exit(0);
   // If new reply: POST /board/1000/new
-  } elseif (!empty($BOARD) && !empty($THREAD)
+  } elseif (!empty($BOARD) && !empty($POST_ID)
       && (!empty($_POST['lorem']) || !empty($_POST['ipsum']))) {
     dba_close($db); // Close the db for reads and reopen for writes
     $db = dba_open($DBA_PATH, 'w', $DBA_HANDLER);
     // Remove the replied-to thread from its place
-    $old_thread_next = dba_fetch($THREAD . '_next', $db);
-    $old_thread_prev = dba_fetch($THREAD . '_prev', $db);
+    $old_thread_next = dba_fetch($POST_ID . '_next', $db);
+    $old_thread_prev = dba_fetch($POST_ID . '_prev', $db);
     dba_replace($old_thread_prev . '_next', $old_thread_next, $db);
     dba_replace($old_thread_next . '_prev', $old_thread_prev, $db);
     // Insert the replied-to thread at the head of the board
-    insert_at_head($BOARD, $THREAD, $db);
+    insert_at_head($BOARD, $POST_ID, $db);
     // Get the ID for the new reply
     $new_reply_id = fresh_id($db);
     // Create the post for the new reply
-    update_post($new_reply_id, $BOARD, $_POST['lorem'], $_POST['ipsum'], $db);
+    update_post($new_reply_id, $BOARD, $POST_ID, $_POST['lorem'], $_POST['ipsum'], $db);
     // Insert the reply at the tail of the thread replies
-    insert_at_tail($THREAD . '_replies', $new_reply_id, $db);
+    insert_at_tail($POST_ID . '_replies', $new_reply_id, $db);
     // Redirect to the thread and exit
-    $redirect_to = '/' . $BOARD . '/' . $THREAD;
+    $redirect_to = '/' . $BOARD . '/' . $POST_ID;
     header('Location: ' . $redirect_to, true, 302);
     dba_close($db);
     exit(0);
@@ -219,16 +230,16 @@ foreach ($BOARDS as $board) {
 if (http_response_code() != 200) { ?>
   <h1>Error <?php echo http_response_code(); ?></h1>
 <?php // If at root path
-} elseif (empty($BOARD) && empty($THREAD)) {
+} elseif (empty($BOARD) && empty($POST_ID)) {
   // Something novel for the root path
-} elseif (!empty($BOARD) && empty($THREAD)) { ?>
+} elseif (!empty($BOARD) && empty($POST_ID)) { ?>
   <header>
     <h1>/<?php echo $BOARD; ?>/</h1>
   </header>
   <main>
 <?php // List threads for the board
   $thread_id = dba_fetch($BOARD . '_head_next', $db);
-  while ($thread_id != $BOARD . '_tail' && empty($NEW)) {
+  while ($thread_id != $BOARD . '_tail' && empty($ACTION)) {
     $thread_subject = dba_fetch($thread_id . '_subject', $db);
     $thread_message = dba_fetch($thread_id . '_message', $db);
     $thread_time = dba_fetch($thread_id . '_time', $db); ?>
@@ -249,13 +260,13 @@ if (http_response_code() != 200) { ?>
 <?php // End of foreach thread loop
     $thread_id = dba_fetch($thread_id . '_next', $db);
   }
-} elseif (!empty($BOARD) && !empty($THREAD)) { ?>
+} elseif (!empty($BOARD) && !empty($POST_ID)) { ?>
   <header>
-    <h1>/<?php echo $BOARD; ?>/<?php echo $THREAD; ?></h1>
+    <h1>/<?php echo $BOARD; ?>/<?php echo $POST_ID; ?></h1>
   </header>
   <main>
 <?php
-  $thread_id = $THREAD;
+  $thread_id = $POST_ID;
   $thread_subject = dba_fetch($thread_id . '_subject', $db);
   $thread_message = dba_fetch($thread_id . '_message', $db);
   $thread_time = dba_fetch($thread_id . '_time', $db); ?>
@@ -272,12 +283,12 @@ if (http_response_code() != 200) { ?>
       <div>
         <p><?php echo str_replace('&#13;&#10;', '<br>', $thread_message); ?></p>
 <?php
-  $reply_id = dba_fetch($THREAD . '_replies_head_next', $db);
-  while ($reply_id != $THREAD . '_replies_tail' && empty($NEW)) {
+  $reply_id = dba_fetch($POST_ID . '_replies_head_next', $db);
+  while ($reply_id != $POST_ID . '_replies_tail' && empty($ACTION)) {
     $reply_subject = dba_fetch($reply_id . '_subject', $db);
     $reply_message = dba_fetch($reply_id . '_message', $db);
     $reply_time = dba_fetch($reply_id . '_time', $db); ?>
-        <section>
+        <section id="reply<?php echo $reply_id; ?>">
           <header>
             <hgroup>
               <h2><?php echo $reply_subject; ?></h2>
@@ -299,7 +310,7 @@ if (http_response_code() != 200) { ?>
 <?php // End main body
 } // Start new thread/reply form
 if (!empty($BOARD)) {
-  if (!empty($BOARD) && empty($THREAD)) { ?>
+  if (!empty($BOARD) && empty($POST_ID)) { ?>
     <section id="newthread">
       <header><h2>New Thread</h2></header>
       <div>
@@ -314,11 +325,11 @@ if (!empty($BOARD)) {
           <p>You got the CAPTCHA wrong</p><p></p>
 <?php
     }
-  } elseif (!empty($BOARD) && !empty($THREAD)) { ?>
+  } elseif (!empty($BOARD) && !empty($POST_ID)) { ?>
     <section id="newreply">
       <header><h2>New Reply</h2></header>
       <div>
-        <form method="post" action="/<?php echo $BOARD . '/' . $THREAD; ?>/new">
+        <form method="post" action="/<?php echo $BOARD . '/' . $POST_ID; ?>/new">
 <?php // If form wasn't filled-out right
     if ($_SERVER['REQUEST_METHOD'] == 'POST'
         && empty($_POST['lorem']) && empty($_POST['ipsum'])) { ?>
