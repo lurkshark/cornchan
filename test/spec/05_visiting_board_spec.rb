@@ -4,13 +4,13 @@ feature "Visiting a board" do
   end
 
   scenario "has the board name" do
-    expect(page).to have_content("/corn/")
+    expect(page).to have_content("corn")
   end
 
   scenario "has a form for posting a new thread" do
-    within("#newthread") do
+    within("#newpost") do
       # Let board_new_spec handle the details
-      expect(find("form")["action"]).to eq("#{Capybara.app_host}/corn/new")
+      expect(find("form")["action"]).to eq("#{Capybara.app_host}/post.php")
     end
   end
 end

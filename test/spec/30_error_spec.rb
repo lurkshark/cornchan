@@ -10,13 +10,6 @@ feature "Return error" do
     end
   end
 
-  context "when a badly arranged path is requested" do
-    given(:path) { "/1000/new" }
-    scenario "returns a 404" do
-      expect(page).to have_content("Error 404")
-    end
-  end
-
   context "when a path for a non-existant board is requested" do
     given(:path) { "/notreal/" }
     scenario "returns a 404" do
@@ -25,7 +18,7 @@ feature "Return error" do
   end
 
   context "when a path for a non-existant thread is requested" do
-    given(:path) { "/corn/9999" }
+    given(:path) { "/corn/res/9999.html" }
     scenario "returns a 404" do
       expect(page).to have_content("Error 404")
     end
@@ -34,7 +27,7 @@ feature "Return error" do
   context "when a path for a mismatched thread is requested" do
     # This test depends on thread_new_spec
     # The correct board is actually /corn/
-    given(:path) { "/prog/10000" }
+    given(:path) { "/news/res/1000.html" }
     scenario "returns a 404" do
       expect(page).to have_content("Error 404")
     end
