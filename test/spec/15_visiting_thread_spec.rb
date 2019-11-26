@@ -10,7 +10,7 @@ feature "Visiting a thread" do
   end
 
   scenario "has a form for posting a new thread" do
-    within("#newpost") do
+    within("#new-post") do
       # Let thread_new_spec handle the details
       expect(find("form")["action"]).to eq("#{Capybara.app_host}/post.php")
     end
