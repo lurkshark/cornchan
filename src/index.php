@@ -60,67 +60,49 @@ $config['csrf'] = generate_token('_csrf');
 
 function render_captcha_form_fragment_html() { global $config;
   ob_start(); ?>
-    <p class="full">
-      <label for="captcha-answer">CAPTCHA</label>
-      <input type="checkbox" name="opt_in_cookie" id="opt-in-cookie" checked>
-      <label for="opt-in-cookie">Use cookie to remember</label>
-      <?php // Generate the CAPTCHA image
-        $captcha = imagecreate(80, 20);
-        imagecolorallocate($captcha, 255, 255, 255);
+    <?php // Generate the CAPTCHA image
+      $captcha = imagecreate(80, 20);
+      imagecolorallocate($captcha, 255, 255, 255);
 
-        $answer = array();
-        $alphabet = range('A', 'Z');
-        while (sizeof($answer) < 6) {
-          $answer[] = $alphabet[random_int(0, sizeof($alphabet) - 1)];
-        }
+      $answer = array();
+      $alphabet = range('A', 'Z');
+      while (sizeof($answer) < 6) {
+        $answer[] = $alphabet[random_int(0, sizeof($alphabet) - 1)];
+      }
 
-        $red = imagecolorallocate($captcha, 192, 64, 64);
-        imagestring($captcha, 5, 5, 2, implode($answer), $red);
+      $red = imagecolorallocate($captcha, 192, 64, 64);
+      imagestring($captcha, 5, 5, 2, implode($answer), $red);
 
-        ob_start();
-        imagepng($captcha, NULL, 9);
-        $bin = ob_get_clean();
-        imagedestroy($captcha);
-        $image_data = base64_encode($bin);
-        $captcha_token = generate_token(implode($answer)); ?>
-      <input type="text" name="captcha_answer" id="captcha-answer" autocomplete="off"
-        style="background: url(data:image/png;base64,<?php echo $image_data; ?>) right no-repeat;">
-      <input type="hidden" name="captcha_token" value="<?php echo $captcha_token; ?>">
-    </p>
+      ob_start();
+      imagepng($captcha, NULL, 9);
+      $bin = ob_get_clean();
+      imagedestroy($captcha);
+      $image_data = base64_encode($bin);
+      $captcha_token = generate_token(implode($answer)); ?>
+    <label for="captcha-answer">Verify</label>
+    <input type="text" name="captcha_answer" id="captcha-answer" autocomplete="off"
+      style="background: url(data:image/png;base64,<?php echo $image_data; ?>) right no-repeat;">
+    <input type="hidden" name="captcha_token" value="<?php echo $captcha_token; ?>">
   <?php return ob_get_clean();
 }
 
 function render_new_post_form_fragment_html($board_or_thread) { global $config;
   ob_start(); ?>
-    <section id="newpost">
-      <header><h2>New Post</h2></header>
-      <div>
-        <form method="post" action="<?php echo $config['base_path'] ?>/post.php">
-          <p>
-            <label for="subject">Subject</label>
-            <input type="text" name="subject" id="subject" autocomplete="off">
-          </p>
-          <p>
-            <!-- <label for="dolor">Upload</label> -->
-            <!-- <input type="file" name="dolor" id="dolor"> -->
-          </p>
-          <p class="full">
-            <label for="message">Message</label>
-            <textarea name="message" id="message"></textarea>
-          </p>
-          <?php echo render_captcha_form_fragment_html(); ?>
-          <p>
-            <label for="delete-code">Delete Code</label>
-            <input type="text" name="delete_code" id="delete-code" autocomplete="off">
-          </p>
-          <p>
-            <button>Submit</button>
-          </p>
-          <input type="hidden" name="csrf_token" value="<?php echo $config['csrf']; ?>">
-          <input type="hidden" name="board_id" value="<?php echo $board_or_thread['board_id']; ?>">
-          <input type="hidden" name="thread_id" value="<?php echo $board_or_thread['thread_id']; ?>">
-        </form>
-      </div>
+    <section id="new-post">
+      <form method="post" action="<?php echo $config['base_path'] ?>/post.php" class="new-post">
+        <label for="subject">Subject</label>
+        <input type="text" name="subject" id="subject" autocomplete="off" class="new-post-subject">
+        <label for="message">Message</label>
+        <textarea name="message" id="message" class="new-post-message"></textarea>
+        <?php echo render_captcha_form_fragment_html(); ?>
+        <label for="password">Password</label>
+        <input type="text" name="password" id="password"
+            autocomplete="off" class="new-post-password">
+        <button class="new-post-submit">Submit</button>
+        <input type="hidden" name="csrf_token" value="<?php echo $config['csrf']; ?>">
+        <input type="hidden" name="board_id" value="<?php echo $board_or_thread['board_id']; ?>">
+        <input type="hidden" name="thread_id" value="<?php echo $board_or_thread['thread_id']; ?>">
+      </form>
     </section>
   <?php return ob_get_clean();
 }
@@ -129,24 +111,20 @@ function render_reply_fragment_html($reply) {}
 
 function render_thread_fragment_html($thread) {
   ob_start(); ?>
-    <article id="<?php echo $thread['thread_id']; ?>">
-      <header>
-        <hgroup>
-          <?php if (!empty($thread['subject'])) { ?>
-            <h2><?php echo $thread['subject']; ?></h2>
-          <?php } ?>
-          <h3>
-            <a href="<?php echo $thread['href']; ?>"><?php echo $thread['thread_id']; ?></a>
-            <time><?php echo date('Y-m-d H:i', $thread['time']); ?></time>
-            <!-- <form class="delete-post" method="post" action="">
-              <input type="hidden" name="csrf-token" value="">
-              <button>&#9421;</button>
-            </form> -->
-          </h3>
-        </hgroup>
+    <article id="<?php echo $thread['thread_id']; ?>" class="thread">
+      <header class="post-details">
+        <span class="post-subject"><?php echo $thread['subject']; ?></span>
+        <span class="post-name"><?php echo $thread['name']; ?></span>
+        <span class="post-tag"><?php echo $thread['tag']; ?></span>
+        <span class="post-time">
+          <time><?php echo date('Y-m-d H:i', $thread['time']); ?></time>
+        </span>
+        <span class="post-id">
+          <a href="<?php echo $thread['href_anchor']; ?>">No.<?php echo $thread['thread_id']; ?></a>
+        </span>
       </header>
-      <div>
-        <p><?php echo str_replace('&#13;&#10;', '<br>', $thread['message']); ?></p>
+      <div class="post-message">
+        <?php echo str_replace('&#13;&#10;', '<br>', $thread['message']); ?>
       </div>
     </article>
   <?php return ob_get_clean();
@@ -157,9 +135,11 @@ function render_board_body_html($board) {
     <header>
       <h1><?php echo $board['board_id']; ?></h1>
     </header>
-    <?php foreach ($board['threads'] as $thread) {
-      echo render_thread_fragment_html($thread);
-    } ?>
+    <?php foreach ($board['threads'] as $thread) { ?>
+      <hr>
+      <?php echo render_thread_fragment_html($thread); ?>
+    <?php } ?>
+    <hr>
     <?php echo render_new_post_form_fragment_html($board); ?>
   <?php return ob_get_clean();
 }
@@ -167,9 +147,11 @@ function render_board_body_html($board) {
 function render_thread_body_html($thread) {
   ob_start(); ?>
     <header>
-      <h1><?php echo $thread['board_id']; ?> <?php echo $thread['thread_id']; ?></h1>
+      <h1><?php echo $thread['thread_id']; ?> : <?php echo $thread['board_id']; ?></h1>
     </header>
+    <hr>
     <?php echo render_thread_fragment_html($thread); ?>
+    <hr>
     <?php echo render_new_post_form_fragment_html($thread); ?>
   <?php return ob_get_clean();
 }
@@ -190,14 +172,15 @@ function render_html($title, $body) { global $config;
       </style>
     </head>
     <body>
-      <nav>
-        <a href="<?php echo $config['base_path']; ?>/" style="font-weight: bold;"><?php echo $config['name']; ?></a>
+      <nav class="top-bar">
+        <span style="font-weight: bold;"><?php echo $config['name']; ?></span>
         <?php foreach ($config['board_ids'] as $board_id) {
           $board_path = $config['base_path'] . '/' . $board_id . '/'; ?>
-          <a href="<?php echo $board_path; ?>"><?php echo $board_path; ?></a>
+          / <a href="<?php echo $board_path; ?>"><?php echo $board_id; ?></a>
         <?php } ?>
       </nav>
       <?php echo $body; ?>
+      <hr>
       <?php // Calculate the milliseconds it took to render the page and last update
         $exec_time = intval((microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000);
         $last_updated = date('Y-m-d H:i', filemtime(__FILE__)); ?>
@@ -212,7 +195,7 @@ function render_html($title, $body) { global $config;
 function with_write_db($func) { global $config, $db;
   dba_close($db); // Close the db for reads and reopen for writes
   $db = $db_w = dba_open($config['dba_path'], 'w', $config['dba_handler']);
-  $func($db_w);
+  $func($db_w); // Execute the callback with the writable db handle
   dba_close($db_w); // Close the db for writes and reopen for reads
   $db = dba_open($config['dba_path'], 'r', $config['dba_handler']);
 }
@@ -270,6 +253,7 @@ function fetch_thread_data($board_id, $thread_id) { global $config, $db;
   $thread['prev_thread_id'] = dba_fetch($thread_key . '.prev_thread_id', $db);
   $thread['reply_count'] = intval(dba_fetch($thread_key . '.reply_count', $db));
   $thread['href'] = $config['base_path'] . '/' . $board_id . '/res/' . $thread_id . '.html';
+  $thread['href_anchor'] = $thread['href'] . '#' . $thread_id;
   $thread['key'] = $thread_key;
 
   $thread['replies'] = array();
@@ -335,6 +319,7 @@ function debug($params, $cookies, $data) { global $db;
     echo $key . ' => ' . $value . '<br>';
     $key = dba_nextkey($db);
   }
+  phpinfo();
 }
 
 function entrypoint($method, $path, $cookies, $data) { global $config;

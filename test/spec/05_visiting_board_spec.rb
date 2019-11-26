@@ -8,7 +8,7 @@ feature "Visiting a board" do
   end
 
   scenario "has a form for posting a new thread" do
-    within("#newpost") do
+    within("#new-post") do
       # Let board_new_spec handle the details
       expect(find("form")["action"]).to eq("#{Capybara.app_host}/post.php")
     end

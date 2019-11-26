@@ -2,16 +2,13 @@ feature "Posting a new reply to a thread" do
   given(:subject) { lorem_ipsum(5) }
   given(:message) { lorem_ipsum(64) }
   given(:captcha) { "GOODCAPTCHA" }
-  given(:cookie)  { :checked }
 
   background do
     visit "/corn/res/1000.html"
-    within("#newpost") do
+    within("#new-post") do
       fill_in "subject", with: subject
       fill_in "message", with: message
       fill_in "captcha_answer", with: captcha
-      uncheck "opt_in_cookie" if cookie == :unchecked
-      check "opt_in_cookie" if cookie == :checked
       click_button "Submit"
     end
   end
@@ -55,22 +52,6 @@ feature "Posting a new reply to a thread" do
     xscenario "redirects to the thread and shows the new subject-only post" do
       expect(page).to have_current_path("/corn/res/1000.html")
       expect(page).to have_content(subject)
-    end
-  end
-
-  context "when the captcha cookie opt-in is checked" do
-    given(:cookie) { :checked }
-    xscenario "redirects to the thread and doesn't prompt for a CAPTCHA" do
-      expect(page).to have_current_path("/corn/res/1000.html")
-      expect(page).to_not have_content("CAPTCHA")
-    end
-  end
-
-  context "when the captcha cookie opt-in is unchecked" do
-    given(:cookie) { :unchecked }
-    xscenario "redirects to the thread and prompts for a CAPTCHA" do
-      expect(page).to have_current_path("/corn/res/1000.html")
-      expect(page).to have_content("CAPTCHA")
     end
   end
 end
