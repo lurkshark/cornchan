@@ -252,7 +252,7 @@ function fetch_thread_data($board_id, $thread_id) { global $config, $db;
   $thread['next_thread_id'] = dba_fetch($thread_key . '.next_thread_id', $db);
   $thread['prev_thread_id'] = dba_fetch($thread_key . '.prev_thread_id', $db);
   $thread['reply_count'] = intval(dba_fetch($thread_key . '.reply_count', $db));
-  $thread['href'] = $config['base_path'] . '/' . $board_id . '/res/' . $thread_id . '.html';
+  $thread['href'] = $config['base_path'] . '/' . $board_id . '/t/' . $thread_id;
   $thread['href_anchor'] = $thread['href'] . '#' . $thread_id;
   $thread['key'] = $thread_key;
 
@@ -326,11 +326,10 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
   $routes = array();
   $routes['GET#/'] = 'get_root';
   $routes['GET#/_debug'] = 'debug';
-  $routes['GET#/post.php'] = 'new_post';
-  $routes['POST#/post.php'] = 'new_post';
   $routes['GET#/%board_id%/'] = 'get_board';
-  $routes['GET#/%board_id%/%page_number%.html'] = 'get_board';
-  $routes['GET#/%board_id%/res/%thread_id%.html'] = 'get_thread';
+  $routes['POST#/%board_id%/publish'] = 'post_board_new';
+  $routes['GET#/%board_id%/t/%thread_id%'] = 'get_thread';
+  $routes['POST#/%board_id%/%thread_id%/publish'] = 'post_thread_new';
 
   $thread_regex = '(?P<thread_id>\d+)';
   $page_number_regex = '(?P<page_number>\d+)';
