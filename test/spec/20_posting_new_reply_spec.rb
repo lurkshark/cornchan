@@ -4,7 +4,11 @@ feature "Posting a new reply to a thread" do
   given(:captcha) { "GOODCAPTCHA" }
 
   background do
+<<<<<<< HEAD
     visit "/corn/t/1000"
+=======
+    visit "/corn/res/1000.html"
+>>>>>>> master
     within("#new-post") do
       fill_in "subject", with: subject
       fill_in "message", with: message

@@ -116,14 +116,14 @@ function render_thread_fragment_html($thread) {
   ob_start(); ?>
     <article id="<?php echo $thread['thread_id']; ?>" class="thread">
       <header class="post-details">
-        <span class="post-id">
-          <a href="<?php echo $thread['href']; ?>"><?php echo $thread['thread_id']; ?></a>
-        </span>
         <span class="post-subject"><?php echo $thread['subject']; ?></span>
         <span class="post-name"><?php echo $thread['name']; ?></span>
         <span class="post-tag"><?php echo $thread['tag']; ?></span>
         <span class="post-time">
           <time><?php echo date('Y-m-d H:i', $thread['time']); ?></time>
+        </span>
+        <span class="post-id">
+          <a href="<?php echo $thread['href_anchor']; ?>">No.<?php echo $thread['thread_id']; ?></a>
         </span>
       </header>
       <div class="post-message">
