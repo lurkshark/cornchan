@@ -31,4 +31,8 @@ hr {
 }
 #captcha-answer {
   text-transform: uppercase;
+<<<<<<< HEAD
+  border: 1px solid;
+=======
+>>>>>>> master
 }

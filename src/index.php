@@ -87,9 +87,12 @@ function render_captcha_form_fragment_html() { global $config;
 }
 
 function render_new_post_form_fragment_html($board_or_thread) { global $config;
+  $form_action = $config['base_path'] . '/' . $board_or_thread['board_id'];
+  if (!empty($board_or_thread['thread_id'])) $form_action .= '/t/' . $board_or_thread['thread_id'];
+  $form_action .= '/publish';
   ob_start(); ?>
     <section id="new-post">
-      <form method="post" action="<?php echo $config['base_path'] ?>/post.php" class="new-post">
+      <form method="post" action="<?php echo $form_action; ?>" class="new-post">
         <label for="subject">Subject</label>
         <input type="text" name="subject" id="subject" autocomplete="off" class="new-post-subject">
         <label for="message">Message</label>
@@ -195,9 +198,10 @@ function render_html($title, $body) { global $config;
 function with_write_db($func) { global $config, $db;
   dba_close($db); // Close the db for reads and reopen for writes
   $db = $db_w = dba_open($config['dba_path'], 'w', $config['dba_handler']);
-  $func($db_w); // Execute the callback with the writable db handle
+  $out = $func($db_w); // Execute the callback with the writable db handle
   dba_close($db_w); // Close the db for writes and reopen for reads
   $db = dba_open($config['dba_path'], 'r', $config['dba_handler']);
+  return $out;
 }
 
 // Gets and increment ID
@@ -252,8 +256,7 @@ function fetch_thread_data($board_id, $thread_id) { global $config, $db;
   $thread['next_thread_id'] = dba_fetch($thread_key . '.next_thread_id', $db);
   $thread['prev_thread_id'] = dba_fetch($thread_key . '.prev_thread_id', $db);
   $thread['reply_count'] = intval(dba_fetch($thread_key . '.reply_count', $db));
-  $thread['href'] = $config['base_path'] . '/' . $board_id . '/res/' . $thread_id . '.html';
-  $thread['href_anchor'] = $thread['href'] . '#' . $thread_id;
+  $thread['href'] = $config['base_path'] . '/' . $board_id . '/t/' . $thread_id;
   $thread['key'] = $thread_key;
 
   $thread['replies'] = array();
@@ -277,15 +280,32 @@ function fetch_board_data($board_id) { global $config, $db;
   return $board;
 }
 
-function new_post($params, $cookies, $data) { global $config;
-  $thread_data = array_filter($data, function($key) {
+function verify_csrf($csrf_token) {
+  return verify_token('_csrf', $csrf_token);
+}
+
+function verify_captcha($captcha_answer, $captcha_token) { global $config;
+  if ($config['test_override'] && $captcha_answer === 'GOODCAPTCHA') return true;
+  return verify_token($captcha_answer, $captcha_token);
+}
+
+function post_board_publish($params, $cookies, $data) { global $config;
+  if (!verify_csrf($data['csrf_token'])
+      || !verify_captcha(strtoupper($data['captcha_answer']), $data['captcha_token'])) {
+    return;
+  }
+
+  $thread_data = array_filter(array_merge($params, $data), function($key) {
     return in_array($key, ['board_id', 'subject', 'message']);
   }, ARRAY_FILTER_USE_KEY);
 
-  with_write_db(function($db_w) use ($thread_data) {
+  $thread = with_write_db(function($db_w) use ($thread_data) {
     $thread = put_thread_data($db_w, $thread_data);
     bump_thread($db_w, $thread);
+    return $thread;
   });
+
+  header('Location: ' . $thread['href']);
 }
 
 function get_root($params, $cookies, $data) { global $config;
@@ -326,11 +346,10 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
   $routes = array();
   $routes['GET#/'] = 'get_root';
   $routes['GET#/_debug'] = 'debug';
-  $routes['GET#/post.php'] = 'new_post';
-  $routes['POST#/post.php'] = 'new_post';
   $routes['GET#/%board_id%/'] = 'get_board';
-  $routes['GET#/%board_id%/%page_number%.html'] = 'get_board';
-  $routes['GET#/%board_id%/res/%thread_id%.html'] = 'get_thread';
+  $routes['POST#/%board_id%/publish'] = 'post_board_publish';
+  $routes['GET#/%board_id%/t/%thread_id%'] = 'get_thread';
+  $routes['POST#/%board_id%/t/%thread_id%/publish'] = 'post_thread_publish';
 
   $thread_regex = '(?P<thread_id>\d+)';
   $page_number_regex = '(?P<page_number>\d+)';

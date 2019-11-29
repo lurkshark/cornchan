@@ -4,7 +4,7 @@ feature "Posting a new reply to a thread" do
   given(:captcha) { "GOODCAPTCHA" }
 
   background do
-    visit "/corn/res/1000.html"
+    visit "/corn/t/1000"
     within("#new-post") do
       fill_in "subject", with: subject
       fill_in "message", with: message
@@ -42,7 +42,7 @@ feature "Posting a new reply to a thread" do
   context "when the subject is empty" do
     given(:subject) { "" }
     xscenario "redirects to the thread and shows the new message-only post" do
-      expect(page).to have_current_path("/corn/res/1000.html")
+      expect(page).to have_current_path("/corn/t/1000")
       expect(page).to have_content(message)
     end
   end
@@ -50,7 +50,7 @@ feature "Posting a new reply to a thread" do
   context "when the message is empty" do
     given(:message) { "" }
     xscenario "redirects to the thread and shows the new subject-only post" do
-      expect(page).to have_current_path("/corn/res/1000.html")
+      expect(page).to have_current_path("/corn/t/1000")
       expect(page).to have_content(subject)
     end
   end

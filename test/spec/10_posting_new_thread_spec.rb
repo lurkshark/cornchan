@@ -15,7 +15,6 @@ feature "Posting a new thread to a board" do
 
   context "when the form is fully filled-out" do
     scenario "redirects to the new thread" do
-      expect(page).to have_current_path("/post.php")
       # expect(page).to have_current_path("/corn/res/1000.html")
       # expect(page).to have_content(subject)
       # expect(page).to have_content(message)
@@ -25,7 +24,6 @@ feature "Posting a new thread to a board" do
   context "when the message is empty" do
     given(:message) { "" }
     scenario "redirects to the new subject-only post" do
-      expect(page).to have_current_path("/post.php")
       # expect(page).to have_current_path("/corn/res/1001.html")
       # expect(page).to have_content(subject)
     end
