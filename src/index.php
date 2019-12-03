@@ -113,7 +113,7 @@ function render_new_post_form_fragment_html($board_or_thread) { global $config;
 
 function render_reply_fragment_html($reply) {
   ob_start(); ?>
-    <div id="<?php echo $reply['reply_id']; ?>" class="reply">
+    <section id="<?php echo $reply['reply_id']; ?>" class="reply">
       <header class="post-details">
         <h3 class="post-subject"><?php echo $reply['subject']; ?></h3>
         <span class="post-id">
@@ -128,7 +128,7 @@ function render_reply_fragment_html($reply) {
       <div class="post-message">
         <?php echo str_replace('&#13;&#10;', '<br>', $reply['message']); ?>
       </div>
-    </div>
+    </section>
   <?php return ob_get_clean();
 }
 
@@ -170,7 +170,7 @@ function render_board_body_html($board) {
 function render_thread_body_html($thread) {
   ob_start(); ?>
     <header>
-      <h1><?php echo $thread['thread_id']; ?>/<?php echo $thread['board_id']; ?></h1>
+      <h1><?php echo $thread['thread_id']; ?> / <?php echo $thread['board_id']; ?></h1>
     </header>
     <hr>
     <?php echo render_thread_fragment_html($thread); ?>
