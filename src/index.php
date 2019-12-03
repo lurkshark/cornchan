@@ -437,14 +437,15 @@ function error_404($params, $cookies, $data) {
   echo '<pre>'; var_dump(['error_404', $params, $cookies, $data]); echo '</pre>';
 }
 
-function debug($params, $cookies, $data) { global $db;
+function debug($params, $cookies, $data) { global $config, $db;
+  if (!$config['test_override']) return error_404($params, $cookies, $data);
+
   $key = dba_firstkey($db);
   while ($key !== false) {
     $value = dba_fetch($key, $db);
     echo $key . ' => ' . $value . '<br>';
     $key = dba_nextkey($db);
   }
-  phpinfo();
 }
 
 function entrypoint($method, $path, $cookies, $data) { global $config;
