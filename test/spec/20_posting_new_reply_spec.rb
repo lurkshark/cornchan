@@ -14,34 +14,16 @@ feature "Posting a new reply to a thread" do
   end
 
   context "when the form is fully filled-out" do
-    xscenario "redirects to the thread and shows the new reply" do
-      expect(page).to have_current_path("/corn/res/1000.html")
+    scenario "redirects to the thread and shows the new reply" do
+      expect(page).to have_current_path("/corn/t/1000")
       expect(page).to have_content(subject)
       expect(page).to have_content(message)
     end
   end
 
-  context "when the form is filled-out with a bad captcha" do
-    given(:captcha) { "BADCAPTCHA" }
-    xscenario "stays on the new post page and shows an error" do
-      expect(page).to have_current_path("/post.php")
-      expect(page).to have_content("You got the CAPTCHA wrong")
-    end
-  end
-
-  context "when the form is empty" do
-    given(:subject) { "" }
-    given(:message) { "" }
-    given(:captcha) { "" }
-    xscenario "stays on the new post page and shows an error" do
-      expect(page).to have_current_path("/post.php")
-      expect(page).to have_content("You need a subject or message")
-    end
-  end
-
   context "when the subject is empty" do
     given(:subject) { "" }
-    xscenario "redirects to the thread and shows the new message-only post" do
+    scenario "redirects to the thread and shows the new message-only post" do
       expect(page).to have_current_path("/corn/t/1000")
       expect(page).to have_content(message)
     end
@@ -49,7 +31,7 @@ feature "Posting a new reply to a thread" do
 
   context "when the message is empty" do
     given(:message) { "" }
-    xscenario "redirects to the thread and shows the new subject-only post" do
+    scenario "redirects to the thread and shows the new subject-only post" do
       expect(page).to have_current_path("/corn/t/1000")
       expect(page).to have_content(subject)
     end

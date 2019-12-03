@@ -9,7 +9,11 @@ hr {
 }
 
 .post-subject {
-  font-weight: bold;
+  font-size: 1em;
+  margin: 0;
+}
+.post-time {
+  font-size: 0.8em;
 }
 
 #new-post {
@@ -31,8 +35,5 @@ hr {
 }
 #captcha-answer {
   text-transform: uppercase;
-<<<<<<< HEAD
   border: 1px solid;
-=======
->>>>>>> master
 }
