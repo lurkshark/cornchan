@@ -239,6 +239,8 @@ function fresh_id($db_w) {
 function bump_thread($db_w, $thread) {
   $thread_head_key = $thread['board_id'] . '#thread_head';
   $old_head_next_id = dba_fetch($thread_head_key . '.next_thread_id', $db_w);
+  if ($old_head_next_id === $thread['thread_id']) return;
+
   $old_head_next_key = $thread['board_id'] . '#' . $old_head_next_id;
   dba_replace($thread_head_key . '.next_thread_id', $thread['thread_id'], $db_w);
   dba_replace($thread['key'] . '.next_thread_id', $old_head_next_id, $db_w);
@@ -265,7 +267,7 @@ function put_reply_data($db_w, $reply) { global $config;
 
   $thread_reply_count = intval(dba_fetch($thread_key . '.reply_count', $db_w));
   dba_replace($thread_key . '.reply_count', $thread_reply_count + 1, $db_w);
-  bump_thread($db_w, fetch_thread_data($board_id, $thread_id));
+  // bump_thread($db_w, fetch_thread_data($board_id, $thread_id));
 
   // Append the reply to the thread replies
   $reply_tail_key = $thread_key . '#reply_tail';
