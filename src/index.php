@@ -416,7 +416,7 @@ function post_board_publish($params, $cookies, $data) { global $config;
 function get_thread($params, $cookies, $data) { global $config;
   $thread = fetch_thread_data($params['board_id'], $params['thread_id']);
   if (!$thread) return error_404($params, $cookies, $data);
-  $title = $thread['thread_id'] . ' : ' . $thread['board_id'] . ' : ' . $config['name'];
+  $title = $thread['thread_id'] . ' / ' . $thread['board_id'] . ' / ' . $config['name'];
   echo render_html($title, render_thread_body_html($thread));
 }
 
@@ -424,7 +424,7 @@ function get_board($params, $cookies, $data) { global $config;
   $board = fetch_board_data($params['board_id']);
   // This likely won't happen because the regex already checks
   if (!$board) return error_404($params, $cookies, $data);
-  $title = $board['board_id'] . ' : ' . $config['name'];
+  $title = $board['board_id'] . ' / ' . $config['name'];
   echo render_html($title, render_board_body_html($board));
 }
 
@@ -433,6 +433,7 @@ function get_root($params, $cookies, $data) { global $config;
 }
 
 function error_404($params, $cookies, $data) {
+  // echo render_html('404 / ' . $config['name'], '');
   echo '<h1>Error 404</h1>';
   echo '<pre>'; var_dump(['error_404', $params, $cookies, $data]); echo '</pre>';
 }
