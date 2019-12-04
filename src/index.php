@@ -241,18 +241,30 @@ function bump_thread($db_w, $thread) {
   $old_head_next_id = dba_fetch($thread_head_key . '.next_thread_id', $db_w);
   if ($old_head_next_id === $thread['thread_id']) return;
 
+  $old_next_id = $thread['next_thread_id'];
+  $old_prev_id = $thread['prev_thread_id'];
+  if (!empty($old_next_id) && !empty($old_prev_id)) {
+    $old_next_key = $thread['board_id'] . '#' . $old_next_id;
+    $old_prev_key = $thread['board_id'] . '#' . $old_prev_id;
+    // Stitch the next of the prev to the next and the prev of the next to the prev
+    dba_replace($old_prev_key . '.next_thread_id', $old_next_id, $db_w);
+    dba_replace($old_next_key . '.prev_thread_id', $old_prev_id, $db_w);
+  }
+
   $old_head_next_key = $thread['board_id'] . '#' . $old_head_next_id;
   dba_replace($thread_head_key . '.next_thread_id', $thread['thread_id'], $db_w);
+  dba_replace($old_head_next_key . '.prev_thread_id', $thread['thread_id'], $db_w);
   dba_replace($thread['key'] . '.next_thread_id', $old_head_next_id, $db_w);
   dba_replace($thread['key'] . '.prev_thread_id', 'thread_head', $db_w);
-  dba_replace($old_head_next_key . '.prev_thread_id', $thread['thread_id'], $db_w);
 }
 
 function put_reply_data($db_w, $reply) { global $config;
-  $reply_id = fresh_id($db_w);
   $board_id = $reply['board_id'];
   $thread_id = $reply['thread_id'];
   $thread_key = $board_id . '#' . $thread_id;
+  if (!fetch_thread_data($board_id, $thread_id)) return false;
+
+  $reply_id = fresh_id($db_w);
   $reply_key = $board_id . '#' . $thread_id . '#' . $reply_id;
 
   dba_replace($reply_key . '.board_id', $board_id, $db_w);
@@ -267,7 +279,7 @@ function put_reply_data($db_w, $reply) { global $config;
 
   $thread_reply_count = intval(dba_fetch($thread_key . '.reply_count', $db_w));
   dba_replace($thread_key . '.reply_count', $thread_reply_count + 1, $db_w);
-  // bump_thread($db_w, fetch_thread_data($board_id, $thread_id));
+  bump_thread($db_w, fetch_thread_data($board_id, $thread_id));
 
   // Append the reply to the thread replies
   $reply_tail_key = $thread_key . '#reply_tail';
@@ -283,8 +295,10 @@ function put_reply_data($db_w, $reply) { global $config;
 }
 
 function put_thread_data($db_w, $thread) { global $config;
-  $thread_id = fresh_id($db_w);
   $board_id = $thread['board_id'];
+  if (!in_array($board_id, $config['board_ids'])) return false;
+
+  $thread_id = fresh_id($db_w);
   $thread_key = $board_id . '#' . $thread_id;
   dba_replace($thread_key . '.board_id', $board_id, $db_w);
   dba_replace($thread_key . '.thread_id', $thread_id, $db_w);
