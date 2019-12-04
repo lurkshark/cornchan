@@ -36,4 +36,9 @@ feature "Posting a new reply to a thread" do
       expect(page).to have_content(subject)
     end
   end
+
+  xscenario "bumps the thread being replied-to" do
+    visit "/corn/"
+    expect(page).to have_content(/1000.*1001/)
+  end
 end
