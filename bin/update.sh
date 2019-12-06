@@ -24,6 +24,7 @@ https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/.htaccess
 https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/favicon.png
 https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/normalize.css
 https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/style.css
+https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/wild.css
 EOF
 
 # Nuke DB while still testing
