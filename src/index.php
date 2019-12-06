@@ -11,6 +11,7 @@ $config['dba_path'] = ($_ENV['CORN_DBA_PATH_OVERRIDE'] ?? $_ENV['HOME']) . 'corn
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
 $config['base_path'] = ''; // Allows for non-top-level;
 $config['anonymous'] = 'Cornonymous';
+$config['language'] = 'en';
 
 // Create the db if it doesn't exist
 if (!file_exists($config['dba_path'])) {
@@ -116,14 +117,10 @@ function render_reply_fragment_html($reply) {
     <section id="<?php echo $reply['reply_id']; ?>" class="reply">
       <header class="post-details">
         <h3 class="post-subject"><?php echo $reply['subject']; ?></h3>
-        <span class="post-id">
-          <a href="<?php echo $reply['href']; ?>"><?php echo $reply['reply_id']; ?></a>
-        </span>
+        <a class="post-id" href="<?php echo $reply['href']; ?>"><?php echo $reply['reply_id']; ?></a>
         <span class="post-name"><?php echo $reply['name']; ?></span>
         <span class="post-tag"><?php echo $reply['tag']; ?></span>
-        <span class="post-time">
-          <time><?php echo date('Y-m-d H:i', $reply['time']); ?></time>
-        </span>
+        <time class="post-time"><?php echo date('Y-m-d H:i', $reply['time']); ?></time>
       </header>
       <div class="post-message">
         <?php echo str_replace('&#13;&#10;', '<br>', $reply['message']); ?>
@@ -137,14 +134,10 @@ function render_thread_fragment_html($thread) {
     <article id="<?php echo $thread['thread_id']; ?>" class="thread">
       <header class="post-details">
         <h2 class="post-subject"><?php echo $thread['subject']; ?></h2>
-        <span class="post-id">
-          <a href="<?php echo $thread['href']; ?>"><?php echo $thread['thread_id']; ?></a>
-        </span>
+        <a class="post-id" href="<?php echo $thread['href']; ?>"><?php echo $thread['thread_id']; ?></a>
         <span class="post-name"><?php echo $thread['name']; ?></span>
         <span class="post-tag"><?php echo $thread['tag']; ?></span>
-        <span class="post-time">
-          <time><?php echo date('Y-m-d H:i', $thread['time']); ?></time>
-        </span>
+        <time class="post-time"><?php echo date('Y-m-d H:i', $thread['time']); ?></time>
       </header>
       <div class="post-message">
         <?php echo str_replace('&#13;&#10;', '<br>', $thread['message']); ?>
@@ -156,7 +149,7 @@ function render_thread_fragment_html($thread) {
 function render_board_body_html($board) {
   ob_start(); ?>
     <header>
-      <h1><?php echo $board['board_id']; ?></h1>
+      <h1 class="title"><?php echo $board['board_id']; ?></h1>
     </header>
     <?php foreach ($board['threads'] as $thread) { ?>
       <hr>
@@ -170,7 +163,7 @@ function render_board_body_html($board) {
 function render_thread_body_html($thread) {
   ob_start(); ?>
     <header>
-      <h1><?php echo $thread['thread_id']; ?> / <?php echo $thread['board_id']; ?></h1>
+      <h1 class="title"><?php echo $thread['thread_id']; ?> / <?php echo $thread['board_id']; ?></h1>
     </header>
     <hr>
     <?php echo render_thread_fragment_html($thread); ?>
@@ -186,7 +179,7 @@ function render_thread_body_html($thread) {
 function render_html($title, $body) { global $config;
   ob_start(); ?>
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="<?php echo $config['language']; ?>">
     <head>
       <title><?php echo $title; ?></title>
       <meta charset="utf-8">
@@ -196,11 +189,12 @@ function render_html($title, $body) { global $config;
       <style>
         <?php include('static/normalize.css'); ?>
         <?php include('static/style.css'); ?>
+        <?php include('static/wild.css'); ?>
       </style>
     </head>
     <body>
       <nav class="top-bar">
-        <span style="font-weight: bold;"><?php echo $config['name']; ?></span>
+        <span class="logo" style="font-weight: bold;"><?php echo $config['name']; ?></span>
         <?php foreach ($config['board_ids'] as $board_id) {
           $board_path = $config['base_path'] . '/' . $board_id . '/'; ?>
           / <a href="<?php echo $board_path; ?>"><?php echo $board_id; ?></a>
@@ -211,7 +205,7 @@ function render_html($title, $body) { global $config;
       <?php // Calculate the milliseconds it took to render the page and last update
         $exec_time = intval((microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000);
         $last_updated = date('Y-m-d H:i', filemtime(__FILE__)); ?>
-      <footer>
+      <footer class="footer">
         <small><?php echo $last_updated; ?> / <?php echo $exec_time; ?>ms</small>
       </footer>
     </body>
