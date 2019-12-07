@@ -1,3 +1,4 @@
+/* http://comicneue.com/ */
 @font-face {
   font-family: 'Comic Neue';
   src: url('/static/font/ComicNeue-Regular.eot');
@@ -6,13 +7,13 @@
   font-weight: 400;
 }
 
-/* @font-face {
+@font-face {
   font-family: 'Comic Neue';
   src: url('/static/font/ComicNeue-Bold.eot');
   src: url('/static/font/ComicNeue-Bold.woff2') format('woff2'),
        url('/static/font/ComicNeue-Bold.woff') format('woff');
   font-weight: 700;
-} */
+}
 
 body {
   /* font-family: Verdana, Arial, Helvetica, sans-serif; */
