@@ -8,6 +8,17 @@ hr {
   border-top: 1px solid;
 }
 
+.thread, .reply {
+  overflow: visible;
+  word-break: break-word;
+}
+.reply {
+  background-color: #f3f3f3;
+  display: inline-block;
+  padding: 0.25em 0.5em;
+  margin: 0.25em 0;
+}
+
 .post-subject {
   font-size: 1em;
   margin: 0;
