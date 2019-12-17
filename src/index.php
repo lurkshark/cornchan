@@ -95,8 +95,10 @@ function render_new_post_form_fragment_html($board_or_thread) { global $config;
   ob_start(); ?>
     <section id="new-post">
       <form method="post" action="<?php echo $form_action; ?>" class="new-post">
-        <label for="subject">Subject</label>
-        <input type="text" name="subject" id="subject" autocomplete="off" class="new-post-subject">
+        <?php if (empty($board_or_thread['thread_id'])) { ?>
+          <label for="subject">Subject</label>
+          <input type="text" name="subject" id="subject" autocomplete="off" class="new-post-subject">
+        <?php } ?>
         <label for="message">Message</label>
         <textarea name="message" id="message" class="new-post-message"></textarea>
         <?php echo render_captcha_form_fragment_html(); ?>
@@ -116,7 +118,6 @@ function render_reply_fragment_html($reply) {
   ob_start(); ?>
     <section id="<?php echo $reply['reply_id']; ?>" class="reply">
       <header class="post-details">
-        <h3 class="post-subject"><?php echo $reply['subject']; ?></h3>
         <a class="post-id" href="<?php echo $reply['href']; ?>"><?php echo $reply['reply_id']; ?></a>
         <span class="post-name"><?php echo $reply['name']; ?></span>
         <span class="post-tag"><?php echo $reply['tag']; ?></span>
@@ -142,7 +143,22 @@ function render_thread_fragment_html($thread) {
       <div class="post-message">
         <?php echo str_replace('&#13;&#10;', '<br>', $thread['message']); ?>
       </div>
+      <?php foreach ($thread['replies'] as $reply) { ?>
+        <?php echo render_reply_fragment_html($reply); ?>
+      <?php } ?>
     </article>
+  <?php return ob_get_clean();
+}
+
+function render_thread_body_html($thread) {
+  ob_start(); ?>
+    <header>
+      <h1 class="title"><?php echo $thread['thread_id']; ?> / <?php echo $thread['board_id']; ?></h1>
+    </header>
+    <hr>
+    <?php echo render_thread_fragment_html($thread); ?>
+    <hr>
+    <?php echo render_new_post_form_fragment_html($thread); ?>
   <?php return ob_get_clean();
 }
 
@@ -157,22 +173,6 @@ function render_board_body_html($board) {
     <?php } ?>
     <hr>
     <?php echo render_new_post_form_fragment_html($board); ?>
-  <?php return ob_get_clean();
-}
-
-function render_thread_body_html($thread) {
-  ob_start(); ?>
-    <header>
-      <h1 class="title"><?php echo $thread['thread_id']; ?> / <?php echo $thread['board_id']; ?></h1>
-    </header>
-    <hr>
-    <?php echo render_thread_fragment_html($thread); ?>
-    <?php foreach ($thread['replies'] as $reply) { ?>
-      <hr>
-      <?php echo render_reply_fragment_html($reply); ?>
-    <?php } ?>
-    <hr>
-    <?php echo render_new_post_form_fragment_html($thread); ?>
   <?php return ob_get_clean();
 }
 
@@ -257,6 +257,7 @@ function put_reply_data($db_w, $reply) { global $config;
   $thread_id = $reply['thread_id'];
   $thread_key = $board_id . '#' . $thread_id;
   if (!fetch_thread_data($board_id, $thread_id)) return false;
+  if (empty(trim($reply['message']))) return false;
 
   $reply_id = fresh_id($db_w);
   $reply_key = $board_id . '#' . $thread_id . '#' . $reply_id;
@@ -265,7 +266,6 @@ function put_reply_data($db_w, $reply) { global $config;
   dba_replace($reply_key . '.thread_id', $thread_id, $db_w);
   dba_replace($reply_key . '.reply_id', $reply_id, $db_w);
   // $name = filter_var($reply['name'], FILTER_SANITIZE_SPECIAL_CHARS);
-  $subject = filter_var($reply['subject'], FILTER_SANITIZE_SPECIAL_CHARS);
   $message = filter_var($reply['message'], FILTER_SANITIZE_SPECIAL_CHARS);
   dba_replace($reply_key . '.subject', $subject, $db_w);
   dba_replace($reply_key . '.message', $message, $db_w);
