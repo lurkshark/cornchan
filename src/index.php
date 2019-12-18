@@ -116,17 +116,19 @@ function render_new_post_form_fragment_html($board_or_thread) { global $config;
 
 function render_reply_fragment_html($reply) {
   ob_start(); ?>
-    <section id="<?php echo $reply['reply_id']; ?>" class="reply">
-      <header class="post-details">
-        <a class="post-id" href="<?php echo $reply['href']; ?>"><?php echo $reply['reply_id']; ?></a>
-        <span class="post-name"><?php echo $reply['name']; ?></span>
-        <span class="post-tag"><?php echo $reply['tag']; ?></span>
-        <time class="post-time"><?php echo date('Y-m-d H:i', $reply['time']); ?></time>
-      </header>
-      <div class="post-message">
-        <?php echo str_replace('&#13;&#10;', '<br>', $reply['message']); ?>
+    <div class="reply-wrapper">
+      <div id="<?php echo $reply['reply_id']; ?>" class="reply">
+        <div class="post-details">
+          <a class="post-id" href="<?php echo $reply['href']; ?>"><?php echo $reply['reply_id']; ?></a>
+          <span class="post-name"><?php echo $reply['name']; ?></span>
+          <span class="post-tag"><?php echo $reply['tag']; ?></span>
+          <time class="post-time"><?php echo date('Y-m-d H:i', $reply['time']); ?></time>
+        </div>
+        <div class="post-message">
+          <?php echo str_replace('&#13;&#10;', '<br>', $reply['message']); ?>
+        </div>
       </div>
-    </section>
+    </div>
   <?php return ob_get_clean();
 }
 
