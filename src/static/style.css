@@ -26,6 +26,12 @@ hr {
 .post-time {
   font-size: 0.8em;
 }
+.post-message p {
+  margin: 0.25em;
+}
+.post-message q::before, .post-message q::after {
+  content: none;
+}
 
 #new-post {
   max-width: 620px;

@@ -60,6 +60,28 @@ function verify_token($tag, $token) { global $config;
 
 $config['csrf'] = generate_token('_csrf');
 
+function render_text($raw_message, $styling = true) { global $config;
+  if (!$styling) return filter_var($raw_message, FILTER_SANITIZE_SPECIAL_CHARS);
+
+  $rules = array();
+  $rules['/\n(\>[^\>\n]+)/'] = "\n<q>\\1</q>";
+  $rules['/(\*\*|__)(.*?)\1/'] = '<strong>\2</strong>';
+  $rules['/(\*|_)(.*?)\1/'] = '<em>\2</em>';
+  $rules['/\>\>(\d+)/'] = '<a href="#\1">>>\1</a>'; // Blind trust that the reply exists
+  $rules['/(https?:\/\/[\w\-\.\~\:\/\?\#\[\]\@\!\$\&\'\(\)\*\+\,\;\=\%]+)/'] = '<a href="\1">\1</a>';
+  $rules['/\n([^\n]+)/'] = '<p>\1</p>';
+  $rules['/\n/'] = '<br>';
+
+  $out = "\n" . preg_replace('/\r/', '', $raw_message);
+  foreach ($rules as $pattern => $replacement) {
+    $out = preg_replace($pattern, $replacement, $out);
+  }
+
+  $out = filter_var($out, FILTER_SANITIZE_SPECIAL_CHARS);
+  $out = preg_replace('/&#60;(\/)?(p|q|br|strong|em|a)&#62;/', '<\1\2>', $out);
+  return preg_replace('/&#60;a href=&#34;(.*?)&#34;&#62;/', '<a href="\1">', $out);
+}
+
 function render_captcha_form_fragment_html() { global $config;
   ob_start(); ?>
     <?php // Generate the CAPTCHA image
@@ -120,12 +142,12 @@ function render_reply_fragment_html($reply) {
       <div id="<?php echo $reply['reply_id']; ?>" class="reply">
         <div class="post-details">
           <a class="post-id" href="<?php echo $reply['href']; ?>"><?php echo $reply['reply_id']; ?></a>
-          <span class="post-name"><?php echo $reply['name']; ?></span>
+          <span class="post-name"><?php echo render_text($reply['name'], false); ?></span>
           <span class="post-tag"><?php echo $reply['tag']; ?></span>
           <time class="post-time"><?php echo date('Y-m-d H:i', $reply['time']); ?></time>
         </div>
         <div class="post-message">
-          <?php echo str_replace('&#13;&#10;', '<br>', $reply['message']); ?>
+          <?php echo render_text($reply['message']); ?>
         </div>
       </div>
     </div>
@@ -136,14 +158,14 @@ function render_thread_fragment_html($thread) {
   ob_start(); ?>
     <article id="<?php echo $thread['thread_id']; ?>" class="thread">
       <header class="post-details">
-        <h2 class="post-subject"><?php echo $thread['subject']; ?></h2>
+        <h2 class="post-subject"><?php echo render_text($thread['subject'], false); ?></h2>
         <a class="post-id" href="<?php echo $thread['href']; ?>"><?php echo $thread['thread_id']; ?></a>
-        <span class="post-name"><?php echo $thread['name']; ?></span>
+        <span class="post-name"><?php echo render_text($thread['name'], false); ?></span>
         <span class="post-tag"><?php echo $thread['tag']; ?></span>
         <time class="post-time"><?php echo date('Y-m-d H:i', $thread['time']); ?></time>
       </header>
       <div class="post-message">
-        <?php echo str_replace('&#13;&#10;', '<br>', $thread['message']); ?>
+        <?php echo render_text($thread['message']); ?>
       </div>
       <?php foreach ($thread['replies'] as $reply) { ?>
         <?php echo render_reply_fragment_html($reply); ?>
@@ -267,10 +289,7 @@ function put_reply_data($db_w, $reply) { global $config;
   dba_replace($reply_key . '.board_id', $board_id, $db_w);
   dba_replace($reply_key . '.thread_id', $thread_id, $db_w);
   dba_replace($reply_key . '.reply_id', $reply_id, $db_w);
-  // $name = filter_var($reply['name'], FILTER_SANITIZE_SPECIAL_CHARS);
-  $message = filter_var($reply['message'], FILTER_SANITIZE_SPECIAL_CHARS);
-  dba_replace($reply_key . '.subject', $subject, $db_w);
-  dba_replace($reply_key . '.message', $message, $db_w);
+  dba_replace($reply_key . '.message', $reply['message'], $db_w);
   dba_replace($reply_key . '.time', time(), $db_w);
 
   $thread_reply_count = intval(dba_fetch($thread_key . '.reply_count', $db_w));
@@ -298,11 +317,9 @@ function put_thread_data($db_w, $thread) { global $config;
   $thread_key = $board_id . '#' . $thread_id;
   dba_replace($thread_key . '.board_id', $board_id, $db_w);
   dba_replace($thread_key . '.thread_id', $thread_id, $db_w);
-  // $name = filter_var($thread['name'], FILTER_SANITIZE_SPECIAL_CHARS);
-  $subject = filter_var($thread['subject'], FILTER_SANITIZE_SPECIAL_CHARS);
-  $message = filter_var($thread['message'], FILTER_SANITIZE_SPECIAL_CHARS);
-  dba_replace($thread_key . '.subject', $subject, $db_w);
-  dba_replace($thread_key . '.message', $message, $db_w);
+  dba_replace($thread_key . '.subject', $thread['subject'], $db_w);
+  dba_replace($thread_key . '.message', $thread['message'], $db_w);
+  // dba_replace($thread_key . '.name', $thread['name'], $db_w);
   dba_replace($thread_key . '.time', time(), $db_w);
 
   dba_replace($thread_key . '.reply_count', '0', $db_w);

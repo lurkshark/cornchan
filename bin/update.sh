@@ -38,4 +38,4 @@ https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/font/Comi
 EOF
 
 # Nuke DB while still testing
-# rm /home/protected/cornchan.db
+rm /home/protected/cornchan.db

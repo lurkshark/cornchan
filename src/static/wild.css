@@ -32,7 +32,11 @@ body {
 }
 .title {}
 .thread {}
-.reply {}
+.reply {
+  background-color: #fcfcfc;
+  border: 1px solid #cfcfcf;
+  border-radius: 3px;
+}
 .post-details {}
 .post-subject {}
 .post-id {
@@ -48,6 +52,12 @@ body {
   color: #666666;
 }
 .post-message {}
+.post-message a {
+  color: #ccad00;
+}
+.post-message q {
+  color: #5d943b;
+}
 .footer {
   color: #666666;
 }
