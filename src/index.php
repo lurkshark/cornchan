@@ -9,7 +9,6 @@ $config['dba_handler'] = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'gdbm';
 // Use the override when provided (e.g. Travis CI) otherwise use the HOME dir
 $config['dba_path'] = ($_ENV['CORN_DBA_PATH_OVERRIDE'] ?? $_ENV['HOME']) . 'cornchan.db';
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
-$config['base_path'] = ''; // Allows for non-top-level;
 $config['anonymous'] = 'Cornonymous';
 $config['language'] = 'en';
 
@@ -110,8 +109,8 @@ function render_captcha_form_fragment_html() { global $config;
   <?php return ob_get_clean();
 }
 
-function render_new_post_form_fragment_html($board_or_thread) { global $config;
-  $form_action = $config['base_path'] . '/' . $board_or_thread['board_id'];
+function render_new_post_form_fragment_html($board_or_thread, $prefill = array()) { global $config;
+  $form_action = '/' . $board_or_thread['board_id'];
   if (!empty($board_or_thread['thread_id'])) $form_action .= '/t/' . $board_or_thread['thread_id'];
   $form_action .= '/publish';
   ob_start(); ?>
@@ -119,10 +118,11 @@ function render_new_post_form_fragment_html($board_or_thread) { global $config;
       <form method="post" action="<?php echo $form_action; ?>" class="new-post">
         <?php if (empty($board_or_thread['thread_id'])) { ?>
           <label for="subject">Subject</label>
-          <input type="text" name="subject" id="subject" autocomplete="off" class="new-post-subject">
+          <input type="text" name="subject" id="subject" autocomplete="off" class="new-post-subject"
+              value="<?php echo $prefill['subject']; ?>">
         <?php } ?>
         <label for="message">Message</label>
-        <textarea name="message" id="message" class="new-post-message"></textarea>
+        <textarea name="message" id="message" class="new-post-message"><?php echo $prefill['message']; ?></textarea>
         <?php echo render_captcha_form_fragment_html(); ?>
         <!-- <label for="password">Password</label>
         <input type="text" name="password" id="password"
@@ -174,6 +174,20 @@ function render_thread_fragment_html($thread) {
   <?php return ob_get_clean();
 }
 
+function render_publish_body_html($board_or_thread, $prefill, $toast) {
+  $headline = !empty($board_or_thread['thread_id']) ?
+      $board_or_thread['board_id'] . ' / ' . $board_or_thread['thread_id'] :
+      $board_or_thread['board_id'];
+  ob_start(); ?>
+    <header>
+      <h1 class="title"><?php echo $headline; ?></h1>
+    </header>
+    <hr>
+    <div class="toast"><?php echo $toast; ?></div>
+    <?php echo render_new_post_form_fragment_html($board_or_thread, $prefill); ?>
+  <?php return ob_get_clean();
+}
+
 function render_thread_body_html($thread) {
   ob_start(); ?>
     <header>
@@ -220,7 +234,7 @@ function render_html($title, $body) { global $config;
       <nav class="top-bar">
         <span class="logo" style="font-weight: bold;"><?php echo $config['name']; ?></span>
         <?php foreach ($config['board_ids'] as $board_id) {
-          $board_path = $config['base_path'] . '/' . $board_id . '/'; ?>
+          $board_path = '/' . $board_id . '/'; ?>
           / <a href="<?php echo $board_path; ?>"><?php echo $board_id; ?></a>
         <?php } ?>
       </nav>
@@ -347,8 +361,7 @@ function fetch_reply_data($board_id, $thread_id, $reply_id) { global $config, $d
   $reply['message'] = dba_fetch($reply_key . '.message', $db);
   $reply['next_reply_id'] = dba_fetch($reply_key . '.next_reply_id', $db);
   $reply['prev_reply_id'] = dba_fetch($reply_key . '.prev_reply_id', $db);
-  $reply['href'] = $config['base_path'] . '/' . $board_id
-      . '/t/' . $thread_id . '#' . $reply_id;
+  $reply['href'] = '/' . $board_id . '/t/' . $thread_id . '#' . $reply_id;
   $reply['key'] = $reply_key;
   return $reply;
 }
@@ -367,7 +380,7 @@ function fetch_thread_data($board_id, $thread_id) { global $config, $db;
   $thread['next_thread_id'] = dba_fetch($thread_key . '.next_thread_id', $db);
   $thread['prev_thread_id'] = dba_fetch($thread_key . '.prev_thread_id', $db);
   $thread['reply_count'] = intval(dba_fetch($thread_key . '.reply_count', $db));
-  $thread['href'] = $config['base_path'] . '/' . $board_id . '/t/' . $thread_id;
+  $thread['href'] = '/' . $board_id . '/t/' . $thread_id;
   $thread['key'] = $thread_key;
 
   $thread['replies'] = array();
@@ -386,7 +399,7 @@ function fetch_board_data($board_id) { global $config, $db;
   if (!in_array($board_id, $config['board_ids'])) return false;
   $board = ['board_id' => $board_id]; // Just for completeness
   $board['thread_count'] = intval(dba_fetch($board_id . '.thread_count', $db));
-  $board['href'] = $config['base_path'] . '/' . $board_id . '/';
+  $board['href'] = '/' . $board_id . '/';
 
   $board['threads'] = array();
   $current_thread_id = dba_fetch($board_id . '#thread_head.next_thread_id', $db);
@@ -409,35 +422,54 @@ function verify_captcha($captcha_answer, $captcha_token) { global $config;
 }
 
 function post_thread_publish($params, $cookies, $data) { global $config;
-  if (!verify_csrf($data['csrf_token'])
-      || !verify_captcha(strtoupper($data['captcha_answer']), $data['captcha_token'])) {
-    return;
-  }
-
   $reply_data = array_filter(array_merge($params, $data), function($key) {
     return in_array($key, ['board_id', 'thread_id', 'subject', 'message']);
   }, ARRAY_FILTER_USE_KEY);
+
+  $thread = fetch_thread_data($params['board_id'], $params['thread_id']);
+  $title = $thread['thread_id'] . ' / ' . $thread['board_id'] . ' / ' . $config['name'];
+
+  if (!verify_csrf($data['csrf_token'])
+      || !verify_captcha(strtoupper($data['captcha_answer']), $data['captcha_token'])) {
+    echo render_html($title, render_publish_body_html($thread, $reply_data, 'Something went wrong; try again'));
+    return;
+  }
 
   $reply = with_write_db(function($db_w) use ($reply_data) {
     return put_reply_data($db_w, $reply_data);
   });
 
-  header('Location: ' . $reply['href']);
-}
-
-function post_board_publish($params, $cookies, $data) { global $config;
-  if (!verify_csrf($data['csrf_token'])
-      || !verify_captcha(strtoupper($data['captcha_answer']), $data['captcha_token'])) {
+  if (!$reply) {
+    echo render_html($title, render_publish_body_html($thread, $reply_data, 'Something went wrong; try again'));
     return;
   }
 
+  header('Location: ' . $reply['href']);
+}
+
+// This can probably be merged with the thread_publish above
+function post_board_publish($params, $cookies, $data) { global $config;
   $thread_data = array_filter(array_merge($params, $data), function($key) {
     return in_array($key, ['board_id', 'subject', 'message']);
   }, ARRAY_FILTER_USE_KEY);
 
+  $board = fetch_board_data($params['board_id']);
+  $title = $board['board_id'] . ' / ' . $config['name'];
+
+  if (!verify_csrf($data['csrf_token'])
+      || !verify_captcha(strtoupper($data['captcha_answer']), $data['captcha_token'])) {
+    echo render_html($title, render_publish_body_html($board, $thread_data, 'Something went wrong; try again'));
+    return;
+  }
+
   $thread = with_write_db(function($db_w) use ($thread_data) {
     return put_thread_data($db_w, $thread_data);
   });
+
+  if (!$thread) {
+    echo render_html($title, render_publish_body_html($board, $thread_data, 'Something went wrong; try again'));
+    return;
+  }
 
   header('Location: ' . $thread['href']);
 }
