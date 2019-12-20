@@ -1,23 +1,5 @@
-/* http://comicneue.com/ */
-@font-face {
-  font-family: 'Comic Neue';
-  src: url('/static/font/ComicNeue-Regular.eot');
-  src: url('/static/font/ComicNeue-Regular.woff2') format('woff2'),
-       url('/static/font/ComicNeue-Regular.woff') format('woff');
-  font-weight: 400;
-}
-
-@font-face {
-  font-family: 'Comic Neue';
-  src: url('/static/font/ComicNeue-Bold.eot');
-  src: url('/static/font/ComicNeue-Bold.woff2') format('woff2'),
-       url('/static/font/ComicNeue-Bold.woff') format('woff');
-  font-weight: 700;
-}
-
 body {
-  /* font-family: Verdana, Arial, Helvetica, sans-serif; */
-  font-family: 'Comic Neue', 'Comic Sans MS', 'Comic Sans', cursive, sans-serif;
+  font-family: Verdana, Arial, Helvetica, sans-serif;
   font-size: 0.85em;
 }
 .top-bar {}
@@ -26,7 +8,7 @@ body {
 }
 .logo {}
 .logo::before {
-  content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABEVBMVEX////0kAtxs1h2slV0sFFxr05qq0X0jQhurUv/jQT0iQSOv3J1slX1qyHv9+/i7dvc6tbM4r+41qe11aOkzI2hyoiRtHuTwnhqtVxvsFGDrktsrEihpzxipjtEijRaoTD3uy5LhihBfxv/qBn1oRn9oBb1oQ//mw36jAT/igHzhQD7/fr5+/fz9+/97NnY6c/737rE3ba/07K/27D72q365Kz60ZX/0JS9xpGfwZGVw3uMvnCBqmeDuWX+tmOBuGJssllxrlJzsVCRtU5nmUmksUSQpkFkpz5fnD5Zlz5bkz1Ljj3FrjX3vTFQijG7oC39uCv2tCnVoCOvkCHQmSD2pR31pB30lhn1qhH0mQfygQCtO3eAAAAAxklEQVQYGQXBA2JEURAAwZ6n77VtxXY2tp3c/yCpAgDShwAAwEoaur0ULG9tAxy0r4ulp9bu8e/PaLYJsOHObu/exqMkkdkqAFG11h9+fr2K9wcAUfV8nAw6nnjfAGScuuoPOqFIuAOAMepy+BiKyGQvA2SdPnl4CUUkeG/1ShBZXfEmQTANvPvuBWCMakw/GjWlT2/WAeZGPeuKimPf2gLAkdEq1tr3c0XXXIC8s3Vr/WYByLWBpXo5u1/OLwKk1gAAAACAfy9xFE7z2X7mAAAAAElFTkSuQmCC);
+  content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAhFBMVEUAAAB4qk1ckjt3slV3s1Vdkjx2sFT0jw/NmjeSs0x3slX0kAx3slV3s1RflT14slT2kw95s1Z5s1ZgmEH3kg1ekTzpsCx4sld7sFhppUt3slX0kAxckTv3uC2AsFD2rCL2ohr1mBL3tCn3sSf0kg1spUqMrUljmUHVpSirkyXPmSD1qB+UKs10AAAAGnRSTlMACvvt5N9FIQL91NS/lIuIh4NlSj08OjUdETITAPAAAACHSURBVBjTZYtHFsMwCAVxjdN7+2DLLf3+9wsyesnCs2IGICOK6c8lIhLRoTgdvCdAkokc55/S8cSXHfCQxrmuZQsEVLXr6pKZ6RfKRj2ESEPbD74JB5janldX9bOGp/lLJCOCwoZIbB8V93cotz1ZeCOQWggsU0B9EXSm89aHAsiBNQ3kNOYLxk8QZQPk45QAAAAASUVORK5CYII=);
   vertical-align: top;
   margin-right: 4px;
 }

@@ -27,15 +27,5 @@ https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/style.css
 https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/wild.css
 EOF
 
-# Download static fonts
-wget --quiet --timestamping --directory-prefix /home/public/static/font --input-file - << 'EOF'
-https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/font/ComicNeue-Bold.eot
-https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/font/ComicNeue-Bold.woff
-https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/font/ComicNeue-Bold.woff2
-https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/font/ComicNeue-Regular.eot
-https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/font/ComicNeue-Regular.woff
-https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/font/ComicNeue-Regular.woff2
-EOF
-
 # Nuke DB while still testing
-rm /home/protected/cornchan.db
+# rm /home/protected/cornchan.db

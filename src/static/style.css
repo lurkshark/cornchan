@@ -21,16 +21,22 @@ hr {
 
 .post-subject {
   font-size: 1em;
-  margin: 0;
+  margin: 0.25em 0;
 }
 .post-time {
   font-size: 0.8em;
 }
 .post-message p {
-  margin: 0.25em;
+  margin: 0.25em 0;
 }
 .post-message q::before, .post-message q::after {
   content: none;
+}
+
+.toast {
+  margin: 0.5em 0;
+  padding: 0.25em;
+  background-color: #ffcccc;
 }
 
 #new-post {
