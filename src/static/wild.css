@@ -15,8 +15,8 @@ body {
 .title {}
 .thread {}
 .reply {
-  background-color: #fcfcfc;
-  border: 1px solid #cfcfcf;
+  background-color: #f9f9f9;
+  border: 1px solid #9f9f9f;
   border-radius: 3px;
 }
 .post-details {}
@@ -24,6 +24,9 @@ body {
 .post-id {
   text-decoration: none;
   color: #ccad00;
+}
+.post-tag {
+  opacity: 0.85;
 }
 .post-name {
   font-style: italic;

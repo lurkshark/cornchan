@@ -136,14 +136,25 @@ function render_new_post_form_fragment_html($board_or_thread, $prefill = array()
   <?php return ob_get_clean();
 }
 
+function render_post_tag_fragment_html($post_tag) {
+  $hashed = hash('sha256', $post_tag);
+  ob_start(); ?>
+    <span class="post-tag-segment" style="background-color: #<?php echo substr($hashed, 0, 6); ?>;">
+    </span><span class="post-tag-segment" style="background-color: #<?php echo substr($hashed, 6, 6); ?>;">
+    </span><span class="post-tag-segment" style="background-color: #<?php echo substr($hashed, 12, 6); ?>;">
+    </span><span class="post-tag-segment" style="background-color: #<?php echo substr($hashed, 18, 6); ?>;">
+    </span>
+  <?php return ob_get_clean(); // margin:0;
+}
+
 function render_reply_fragment_html($reply) {
   ob_start(); ?>
     <div class="reply-wrapper">
       <div id="<?php echo $reply['reply_id']; ?>" class="reply">
         <div class="post-details">
           <a class="post-id" href="<?php echo $reply['href']; ?>"><?php echo $reply['reply_id']; ?></a>
+          <span class="post-tag"><?php echo render_post_tag_fragment_html($reply['tag']); ?></span>
           <span class="post-name"><?php echo render_text($reply['name'], false); ?></span>
-          <span class="post-tag"><?php echo $reply['tag']; ?></span>
           <time class="post-time"><?php echo date('Y-m-d H:i', $reply['time']); ?></time>
         </div>
         <div class="post-message">
@@ -160,8 +171,8 @@ function render_thread_fragment_html($thread) {
       <header class="post-details">
         <h2 class="post-subject"><?php echo render_text($thread['subject'], false); ?></h2>
         <a class="post-id" href="<?php echo $thread['href']; ?>"><?php echo $thread['thread_id']; ?></a>
+        <span class="post-tag"><?php echo render_post_tag_fragment_html($thread['tag']); ?></span>
         <span class="post-name"><?php echo render_text($thread['name'], false); ?></span>
-        <span class="post-tag"><?php echo $thread['tag']; ?></span>
         <time class="post-time"><?php echo date('Y-m-d H:i', $thread['time']); ?></time>
       </header>
       <div class="post-message">
@@ -304,6 +315,8 @@ function put_reply_data($db_w, $reply) { global $config;
   dba_replace($reply_key . '.thread_id', $thread_id, $db_w);
   dba_replace($reply_key . '.reply_id', $reply_id, $db_w);
   dba_replace($reply_key . '.message', $reply['message'], $db_w);
+  // dba_replace($reply_key . '.name', $reply['name'], $db_w);
+  dba_replace($reply_key . '.ip', $reply['ip'], $db_w);
   dba_replace($reply_key . '.time', time(), $db_w);
 
   $thread_reply_count = intval(dba_fetch($thread_key . '.reply_count', $db_w));
@@ -334,6 +347,7 @@ function put_thread_data($db_w, $thread) { global $config;
   dba_replace($thread_key . '.subject', $thread['subject'], $db_w);
   dba_replace($thread_key . '.message', $thread['message'], $db_w);
   // dba_replace($thread_key . '.name', $thread['name'], $db_w);
+  dba_replace($thread_key . '.ip', $thread['ip'], $db_w);
   dba_replace($thread_key . '.time', time(), $db_w);
 
   dba_replace($thread_key . '.reply_count', '0', $db_w);
@@ -357,6 +371,10 @@ function fetch_reply_data($board_id, $thread_id, $reply_id) { global $config, $d
   $reply['name'] = dba_fetch($reply_key . '.name', $db);
   if (empty($reply['name'])) $reply['name'] = $config['anonymous'];
 
+  $reply['ip'] = dba_fetch($reply_key . '.ip', $db);
+  $tag_source_data = $reply['ip'] . $reply['thread_id'];
+  $reply['tag'] = hash_hmac('sha256', $tag_source_data, $config['secret']);
+
   $reply['subject'] = dba_fetch($reply_key . '.subject', $db);
   $reply['message'] = dba_fetch($reply_key . '.message', $db);
   $reply['next_reply_id'] = dba_fetch($reply_key . '.next_reply_id', $db);
@@ -374,6 +392,10 @@ function fetch_thread_data($board_id, $thread_id) { global $config, $db;
 
   $thread['name'] = dba_fetch($thread_key . '.name', $db);
   if (empty($thread['name'])) $thread['name'] = $config['anonymous'];
+
+  $thread['ip'] = dba_fetch($thread_key . '.ip', $db);
+  $tag_source_data = $thread['ip'] . $thread['thread_id'];
+  $thread['tag'] = hash_hmac('sha256', $tag_source_data, $config['secret']);
 
   $thread['subject'] = dba_fetch($thread_key . '.subject', $db);
   $thread['message'] = dba_fetch($thread_key . '.message', $db);
@@ -423,7 +445,7 @@ function verify_captcha($captcha_answer, $captcha_token) { global $config;
 
 function post_thread_publish($params, $cookies, $data) { global $config;
   $reply_data = array_filter(array_merge($params, $data), function($key) {
-    return in_array($key, ['board_id', 'thread_id', 'subject', 'message']);
+    return in_array($key, ['board_id', 'thread_id', 'subject', 'message', 'ip']);
   }, ARRAY_FILTER_USE_KEY);
 
   $thread = fetch_thread_data($params['board_id'], $params['thread_id']);
@@ -450,7 +472,7 @@ function post_thread_publish($params, $cookies, $data) { global $config;
 // This can probably be merged with the thread_publish above
 function post_board_publish($params, $cookies, $data) { global $config;
   $thread_data = array_filter(array_merge($params, $data), function($key) {
-    return in_array($key, ['board_id', 'subject', 'message']);
+    return in_array($key, ['board_id', 'subject', 'message', 'ip']);
   }, ARRAY_FILTER_USE_KEY);
 
   $board = fetch_board_data($params['board_id']);
@@ -539,7 +561,8 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
       $params = array_filter($matches, function($key) {
         return in_array($key, ['board_id', 'page_number', 'thread_id']);
       }, ARRAY_FILTER_USE_KEY);
-      // Call the function for this route
+      $data['ip'] = $data['REMOTE_ADDR'];
+      // Call the function for this route with all the data
       call_user_func($route_handler, $params, $cookies, $data);
       return;
     }
@@ -551,4 +574,4 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-entrypoint($method, $path, $_COOKIE, $_POST);
+entrypoint($method, $path, $_COOKIE, array_merge($_SERVER, $_POST));

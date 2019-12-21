@@ -23,6 +23,14 @@ hr {
   font-size: 1em;
   margin: 0.25em 0;
 }
+.post-tag {
+  font-size: 0.85em;
+}
+.post-tag-segment {
+  display: inline-block;
+  height: 0.85em;
+  width: 0.35em;
+}
 .post-time {
   font-size: 0.8em;
 }
@@ -55,6 +63,10 @@ hr {
 #new-post textarea,
 #new-post button {
   grid-column: 2 / 3;
+  padding: 0.25em;
+}
+#new-post textarea {
+  height: 8em;
 }
 #captcha-answer {
   text-transform: uppercase;
