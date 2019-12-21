@@ -15,7 +15,7 @@ feature "Posting a new thread to a board" do
 
   context "when the form is fully filled-out" do
     scenario "redirects to the new thread" do
-      expect(page).to have_current_path("/corn/t/1000")
+      expect(page).to have_current_path(/\/corn\/t\/\d+/)
       expect(page).to have_content(subject)
       expect(page).to have_content(message)
     end
@@ -24,8 +24,23 @@ feature "Posting a new thread to a board" do
   context "when the message is empty" do
     given(:message) { "" }
     scenario "redirects to the new subject-only post" do
-      expect(page).to have_current_path("/corn/t/1001")
+      expect(page).to have_current_path(/\/corn\/t\/\d+/)
       expect(page).to have_content(subject)
+    end
+  end
+
+  context "when the subject and message are empty" do
+    given(:subject) { "" }
+    given(:message) { "" }
+    scenario "fails to post the new thread and stays on the publish path" do
+      expect(page).to have_current_path("/corn/publish")
+    end
+  end
+
+  context "when the captcha is wrong" do
+    given(:captcha) { "BADCAPTCHA" }
+    scenario "fails to post the new thread and stays on the publish path" do
+      expect(page).to have_current_path("/corn/publish")
     end
   end
 end

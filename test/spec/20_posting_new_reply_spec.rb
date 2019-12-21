@@ -1,9 +1,13 @@
 feature "Posting a new reply to a thread" do
   given(:message) { lorem_ipsum(64) }
   given(:captcha) { "GOODCAPTCHA" }
+  given(:thread_id) do
+    page.current_path.match(/\/corn\/t\/(\d+)/)[1]
+  end
 
   background do
-    visit "/corn/t/1000"
+    visit "/corn/"
+    first(".thread a.post-id").click
     within("#new-post") do
       fill_in "message", with: message
       fill_in "captcha_answer", with: captcha
@@ -13,7 +17,7 @@ feature "Posting a new reply to a thread" do
 
   context "when the form is fully filled-out" do
     scenario "redirects to the thread and shows the new reply" do
-      expect(page).to have_current_path("/corn/t/1000")
+      expect(page).to have_current_path("/corn/t/#{thread_id}")
       expect(page).to have_content(message)
     end
   end
@@ -21,7 +25,7 @@ feature "Posting a new reply to a thread" do
   context "when the message is empty" do
     given(:message) { "" }
     scenario "fails to post the new reply and stays on the publish path" do
-      expect(page).to have_current_path("/corn/t/1000/publish")
+      expect(page).to have_current_path("/corn/t/#{thread_id}/publish")
     end
   end
 

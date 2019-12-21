@@ -1,18 +1,22 @@
 feature "Visiting a thread" do
-  background do
-    # These tests depend on thread_new_spec
-    visit "/corn/t/1000"
+  given(:thread_id) do
+    page.current_path.match(/\/corn\/t\/(\d+)/)[1]
   end
 
-  scenario "has the board and thread name" do
+  background do
+    visit "/corn/"
+    first(".thread a.post-id").click
+  end
+
+  scenario "has the board and thread id" do
     expect(page).to have_content("corn")
-    expect(page).to have_content("1000")
+    expect(page).to have_content(thread_id)
   end
 
   scenario "has a form for posting a new thread" do
     within("#new-post") do
       # Let thread_new_spec handle the details
-      expect(find("form")["action"]).to eq("#{Capybara.app_host}/corn/t/1000/publish")
+      expect(find("form")["action"]).to eq("#{Capybara.app_host}/corn/t/#{thread_id}/publish")
     end
   end
 end
