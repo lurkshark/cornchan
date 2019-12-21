@@ -137,12 +137,13 @@ function render_new_post_form_fragment_html($board_or_thread, $prefill = array()
 }
 
 function render_post_tag_fragment_html($post_tag) {
-  $hashed = hash('sha256', $post_tag);
+  $tags = array_map(function($hex_chunk) {
+    return 'hsl(' . (hexdec($hex_chunk) % 24) * 15 . ', 100%, 50%)';
+  }, str_split(hash('sha256', $post_tag), 8));
   ob_start(); ?>
-    <span class="post-tag-segment" style="background-color: #<?php echo substr($hashed, 0, 6); ?>;">
-    </span><span class="post-tag-segment" style="background-color: #<?php echo substr($hashed, 6, 6); ?>;">
-    </span><span class="post-tag-segment" style="background-color: #<?php echo substr($hashed, 12, 6); ?>;">
-    </span><span class="post-tag-segment" style="background-color: #<?php echo substr($hashed, 18, 6); ?>;">
+    <span class="post-tag-segment" style="background-color: <?php echo $tags[0]; ?>;">
+    </span><span class="post-tag-segment" style="background-color: <?php echo $tags[1]; ?>;">
+    </span><span class="post-tag-segment" style="background-color: <?php echo $tags[2]; ?>;">
     </span>
   <?php return ob_get_clean(); // margin:0;
 }
@@ -339,6 +340,7 @@ function put_reply_data($db_w, $reply) { global $config;
 function put_thread_data($db_w, $thread) { global $config;
   $board_id = $thread['board_id'];
   if (!in_array($board_id, $config['board_ids'])) return false;
+  if (empty(trim($thread['subject'])) && empty(trim($thread['message']))) return false;
 
   $thread_id = fresh_id($db_w);
   $thread_key = $board_id . '#' . $thread_id;
