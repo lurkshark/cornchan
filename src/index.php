@@ -21,6 +21,7 @@ if (!file_exists($config['dba_path'])) {
   dba_replace('_metadata.id', '999', $db_c);
   dba_replace('_config.name', 'cornchan', $db_c);
   dba_replace('_config.board_ids', json_encode($board_ids), $db_c);
+  dba_replace('_config.admin', hash('sha256', bin2hex(random_bytes(8)), $db_c));
   dba_replace('_config.secret', bin2hex(random_bytes(32)), $db_c);
   foreach ($board_ids as $board_id) {
     dba_replace($board_id . '.thread_count', '0', $db_c);
@@ -47,14 +48,40 @@ function generate_token($tag) { global $config;
 }
 
 // Verifies a HMAC token from generate_token
-function verify_token($tag, $token) { global $config;
+function verify_token($tag, $token, $hours = 1) { global $config;
   [$time, $hmac] = explode('.', $token);
-  if (time() - intval($time) > 3600) {
+  if ($hours > 0 && time() - intval($time) > $hours * 3600) {
     return false;
   }
   // Verify the hmac because timestamp is good
   $expected_message = implode('.', [$tag, $time]);
   return hash_hmac('sha256', $expected_message, $config['secret']) == $hmac;
+}
+
+function set_role($role) {
+  if (!in_array($role, ['_ok', '_moderator', '_admin'])) return;
+  setcookie('role', $role . '.' . generate_token($role), 0, '/');
+}
+
+function get_role($cookies) {
+  if (empty($cookies['role'])) return false;
+  $role_cookie = explode('.', $cookies['role']);
+  $role_cookie_token = implode('.', array_slice($role_cookie, 1));
+  if (($role_cookie[0] === '_ok' && verify_token('_ok', $role_cookie_token, 3))
+      || ($role_cookie[0] === '_moderator' && verify_token('_moderator', $role_cookie_token, 6))
+      || ($role_cookie[0] === '_admin' && verify_token('_admin', $role_cookie_token, 12))) {
+    return $role_cookie[0];
+  }
+  return false;
+}
+
+function fetch_role($data) { global $db;
+  if (empty($data['password'])) return false;
+  $hashed_password = hash('sha256', $data['password']);
+  if ($hashed_password === dba_fetch('_config.admin', $db)) {
+    return '_admin';
+  }
+  return false;
 }
 
 $config['csrf'] = generate_token('_csrf');
@@ -109,7 +136,7 @@ function render_captcha_form_fragment_html() { global $config;
   <?php return ob_get_clean();
 }
 
-function render_new_post_form_fragment_html($board_or_thread, $prefill = array()) { global $config;
+function render_new_post_form_fragment_html($board_or_thread, $role, $prefill = array()) { global $config;
   $form_action = '/' . $board_or_thread['board_id'];
   if (!empty($board_or_thread['thread_id'])) $form_action .= '/t/' . $board_or_thread['thread_id'];
   $form_action .= '/publish';
@@ -123,7 +150,8 @@ function render_new_post_form_fragment_html($board_or_thread, $prefill = array()
         <?php } ?>
         <label for="message">Message</label>
         <textarea name="message" id="message" class="new-post-message"><?php echo $prefill['message']; ?></textarea>
-        <?php echo render_captcha_form_fragment_html(); ?>
+        <?php if (!$role) echo render_captcha_form_fragment_html(); ?>
+        <!-- <?php echo $role; ?> -->
         <!-- <label for="password">Password</label>
         <input type="text" name="password" id="password"
             autocomplete="off" class="new-post-password"> -->
@@ -186,7 +214,7 @@ function render_thread_fragment_html($thread) {
   <?php return ob_get_clean();
 }
 
-function render_publish_body_html($board_or_thread, $prefill, $toast) {
+function render_publish_body_html($board_or_thread, $role, $prefill, $toast) {
   $headline = !empty($board_or_thread['thread_id']) ?
       $board_or_thread['board_id'] . ' / ' . $board_or_thread['thread_id'] :
       $board_or_thread['board_id'];
@@ -196,11 +224,11 @@ function render_publish_body_html($board_or_thread, $prefill, $toast) {
     </header>
     <hr>
     <div class="toast"><?php echo $toast; ?></div>
-    <?php echo render_new_post_form_fragment_html($board_or_thread, $prefill); ?>
+    <?php echo render_new_post_form_fragment_html($board_or_thread, $role, $prefill); ?>
   <?php return ob_get_clean();
 }
 
-function render_thread_body_html($thread) {
+function render_thread_body_html($thread, $role) {
   ob_start(); ?>
     <header>
       <h1 class="title"><?php echo $thread['thread_id']; ?> / <?php echo $thread['board_id']; ?></h1>
@@ -208,11 +236,11 @@ function render_thread_body_html($thread) {
     <hr>
     <?php echo render_thread_fragment_html($thread); ?>
     <hr>
-    <?php echo render_new_post_form_fragment_html($thread); ?>
+    <?php echo render_new_post_form_fragment_html($thread, $role); ?>
   <?php return ob_get_clean();
 }
 
-function render_board_body_html($board) {
+function render_board_body_html($board, $role) {
   ob_start(); ?>
     <header>
       <h1 class="title"><?php echo $board['board_id']; ?></h1>
@@ -222,7 +250,7 @@ function render_board_body_html($board) {
       <?php echo render_thread_fragment_html($thread); ?>
     <?php } ?>
     <hr>
-    <?php echo render_new_post_form_fragment_html($board); ?>
+    <?php echo render_new_post_form_fragment_html($board, $role); ?>
   <?php return ob_get_clean();
 }
 
@@ -436,16 +464,7 @@ function fetch_board_data($board_id) { global $config, $db;
   return $board;
 }
 
-function verify_csrf($csrf_token) {
-  return verify_token('_csrf', $csrf_token);
-}
-
-function verify_captcha($captcha_answer, $captcha_token) { global $config;
-  if ($config['test_override'] && $captcha_answer === 'GOODCAPTCHA') return true;
-  return verify_token($captcha_answer, $captcha_token);
-}
-
-function post_thread_publish($params, $cookies, $data) { global $config;
+function post_thread_publish($params, $data, $role) { global $config;
   $reply_data = array_filter(array_merge($params, $data), function($key) {
     return in_array($key, ['board_id', 'thread_id', 'subject', 'message', 'ip']);
   }, ARRAY_FILTER_USE_KEY);
@@ -453,9 +472,9 @@ function post_thread_publish($params, $cookies, $data) { global $config;
   $thread = fetch_thread_data($params['board_id'], $params['thread_id']);
   $title = $thread['thread_id'] . ' / ' . $thread['board_id'] . ' / ' . $config['name'];
 
-  if (!verify_csrf($data['csrf_token'])
-      || !verify_captcha(strtoupper($data['captcha_answer']), $data['captcha_token'])) {
-    echo render_html($title, render_publish_body_html($thread, $reply_data, 'Something went wrong; try again'));
+  if (!$role) {
+    echo render_html($title, render_publish_body_html($thread, $role, $reply_data,
+        'Unauthorized; try again'));
     return;
   }
 
@@ -464,7 +483,8 @@ function post_thread_publish($params, $cookies, $data) { global $config;
   });
 
   if (!$reply) {
-    echo render_html($title, render_publish_body_html($thread, $reply_data, 'Something went wrong; try again'));
+    echo render_html($title, render_publish_body_html($thread, $role, $reply_data,
+        'Something went wrong; try again'));
     return;
   }
 
@@ -472,7 +492,7 @@ function post_thread_publish($params, $cookies, $data) { global $config;
 }
 
 // This can probably be merged with the thread_publish above
-function post_board_publish($params, $cookies, $data) { global $config;
+function post_board_publish($params, $data, $role) { global $config;
   $thread_data = array_filter(array_merge($params, $data), function($key) {
     return in_array($key, ['board_id', 'subject', 'message', 'ip']);
   }, ARRAY_FILTER_USE_KEY);
@@ -480,9 +500,9 @@ function post_board_publish($params, $cookies, $data) { global $config;
   $board = fetch_board_data($params['board_id']);
   $title = $board['board_id'] . ' / ' . $config['name'];
 
-  if (!verify_csrf($data['csrf_token'])
-      || !verify_captcha(strtoupper($data['captcha_answer']), $data['captcha_token'])) {
-    echo render_html($title, render_publish_body_html($board, $thread_data, 'Something went wrong; try again'));
+  if (!$role) {
+    echo render_html($title, render_publish_body_html($board, $role, $thread_data,
+        'Unauthorized; try again'));
     return;
   }
 
@@ -491,40 +511,41 @@ function post_board_publish($params, $cookies, $data) { global $config;
   });
 
   if (!$thread) {
-    echo render_html($title, render_publish_body_html($board, $thread_data, 'Something went wrong; try again'));
+    echo render_html($title, render_publish_body_html($board, $role, $thread_data,
+        'Something went wrong; try again'));
     return;
   }
 
   header('Location: ' . $thread['href']);
 }
 
-function get_thread($params, $cookies, $data) { global $config;
+function get_thread($params, $data, $role) { global $config;
   $thread = fetch_thread_data($params['board_id'], $params['thread_id']);
-  if (!$thread) return error_404($params, $cookies, $data);
+  if (!$thread) return error_404($params, $data, $role);
   $title = $thread['thread_id'] . ' / ' . $thread['board_id'] . ' / ' . $config['name'];
-  echo render_html($title, render_thread_body_html($thread));
+  echo render_html($title, render_thread_body_html($thread, $role));
 }
 
-function get_board($params, $cookies, $data) { global $config;
+function get_board($params, $data, $role) { global $config;
   $board = fetch_board_data($params['board_id']);
   // This likely won't happen because the regex already checks
-  if (!$board) return error_404($params, $cookies, $data);
+  if (!$board) return error_404($params, $data, $role);
   $title = $board['board_id'] . ' / ' . $config['name'];
-  echo render_html($title, render_board_body_html($board));
+  echo render_html($title, render_board_body_html($board, $role));
 }
 
-function get_root($params, $cookies, $data) { global $config;
+function get_root($params, $data, $role) { global $config;
   echo render_html($config['name'], '');
 }
 
-function error_404($params, $cookies, $data) {
+function error_404($params, $data, $role) {
   // echo render_html('404 / ' . $config['name'], '');
   echo '<h1>Error 404</h1>';
-  echo '<pre>'; var_dump(['error_404', $params, $cookies, $data]); echo '</pre>';
+  echo '<pre>'; var_dump(['error_404', $params, $data, $role]); echo '</pre>';
 }
 
-function debug($params, $cookies, $data) { global $config, $db;
-  if (!$config['test_override']) return error_404($params, $cookies, $data);
+function debug($params, $data, $role) { global $config, $db;
+  if (!$config['test_override']) return error_404($params, $data, $role);
 
   $key = dba_firstkey($db);
   while ($key !== false) {
@@ -534,14 +555,48 @@ function debug($params, $cookies, $data) { global $config, $db;
   }
 }
 
+function middleware_verify_csrf($method, $data) {
+  if ($method === 'GET') return true;
+  $csrf_token = $data['csrf_token'];
+  return verify_token('_csrf', $csrf_token);
+}
+
+function middleware_verify_captcha($data) { global $config;
+  $captcha_token = $data['captcha_token'];
+  $captcha_answer = strtoupper($data['captcha_answer']);
+  if ($config['test_override'] && $captcha_answer === 'GOODCAPTCHA') return true;
+  return verify_token($captcha_answer, $captcha_token);
+}
+
+function middleware_role($method, $cookies, $data) { global $config, $db;
+  if (!middleware_verify_csrf($method, $data)) return false;
+  $fresh_role = fetch_role($data);
+  if ($fresh_role) {
+    set_role($fresh_role);
+    return $fresh_role;
+  }
+
+  $existing_role = get_role($cookies);
+  if ($existing_role) return $existing_role;
+
+  if (middleware_verify_captcha($data)) {
+    set_role('_ok');
+    return '_ok';
+  }
+
+  return false;
+}
+
 function entrypoint($method, $path, $cookies, $data) { global $config;
   $routes = array();
   $routes['GET#/'] = 'get_root';
   $routes['GET#/_debug'] = 'debug';
   $routes['GET#/%board_id%/'] = 'get_board';
   $routes['POST#/%board_id%/publish'] = 'post_board_publish';
+  $routes['POST#/%board_id%/delete'] = 'post_board_delete';
   $routes['GET#/%board_id%/t/%thread_id%'] = 'get_thread';
   $routes['POST#/%board_id%/t/%thread_id%/publish'] = 'post_thread_publish';
+  $routes['POST#/%board_id%/t/%thread_id%/delete'] = 'post_thread_delete';
 
   $thread_regex = '(?P<thread_id>\d+)';
   $page_number_regex = '(?P<page_number>\d+)';
@@ -564,8 +619,9 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
         return in_array($key, ['board_id', 'page_number', 'thread_id']);
       }, ARRAY_FILTER_USE_KEY);
       $data['ip'] = $data['REMOTE_ADDR'];
+      $role = middleware_role($method, $cookies, $data);
       // Call the function for this route with all the data
-      call_user_func($route_handler, $params, $cookies, $data);
+      call_user_func($route_handler, $params, $data, $role);
       return;
     }
   }
