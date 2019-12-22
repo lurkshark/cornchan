@@ -21,7 +21,7 @@ if (!file_exists($config['dba_path'])) {
   dba_replace('_metadata.id', '999', $db_c);
   dba_replace('_config.name', 'cornchan', $db_c);
   dba_replace('_config.board_ids', json_encode($board_ids), $db_c);
-  dba_replace('_config.admin', hash('sha256', bin2hex(random_bytes(8)), $db_c));
+  dba_replace('_config.admin', hash('sha256', bin2hex(random_bytes(4))), $db_c);
   dba_replace('_config.secret', bin2hex(random_bytes(32)), $db_c);
   foreach ($board_ids as $board_id) {
     dba_replace($board_id . '.thread_count', '0', $db_c);
@@ -151,7 +151,6 @@ function render_new_post_form_fragment_html($board_or_thread, $role, $prefill = 
         <label for="message">Message</label>
         <textarea name="message" id="message" class="new-post-message"><?php echo $prefill['message']; ?></textarea>
         <?php if (!$role) echo render_captcha_form_fragment_html(); ?>
-        <!-- <?php echo $role; ?> -->
         <!-- <label for="password">Password</label>
         <input type="text" name="password" id="password"
             autocomplete="off" class="new-post-password"> -->
@@ -173,7 +172,7 @@ function render_post_tag_fragment_html($post_tag) {
     </span><span class="post-tag-segment" style="background-color: <?php echo $tags[1]; ?>;">
     </span><span class="post-tag-segment" style="background-color: <?php echo $tags[2]; ?>;">
     </span>
-  <?php return ob_get_clean(); // margin:0;
+  <?php return ob_get_clean();
 }
 
 function render_reply_fragment_html($reply) {
@@ -464,59 +463,48 @@ function fetch_board_data($board_id) { global $config, $db;
   return $board;
 }
 
-function post_thread_publish($params, $data, $role) { global $config;
-  $reply_data = array_filter(array_merge($params, $data), function($key) {
+function post_publish($params, $data, $role) { global $config;
+  $thread_or_reply_data = array_filter(array_merge($params, $data), function($key) {
     return in_array($key, ['board_id', 'thread_id', 'subject', 'message', 'ip']);
   }, ARRAY_FILTER_USE_KEY);
+  // This post is a reply if there is a thread_id
+  $is_reply_post = !empty($thread_or_reply_data['thread_id']);
 
-  $thread = fetch_thread_data($params['board_id'], $params['thread_id']);
-  $title = $thread['thread_id'] . ' / ' . $thread['board_id'] . ' / ' . $config['name'];
+  $board_or_thread = $is_reply_post ?
+      fetch_thread_data($params['board_id'], $params['thread_id']) :
+      fetch_board_data($params['board_id']);
+  $title = $is_reply_post ? $board_or_thread['thread_id'] . ' / ' : '';
+  $title .= $board_or_thread['board_id'] . ' / ' . $config['name'];
 
   if (!$role) {
-    echo render_html($title, render_publish_body_html($thread, $role, $reply_data,
-        'Unauthorized; try again'));
+    echo render_html($title, render_publish_body_html($board_or_thread, $role,
+        $thread_or_reply_data, 'Unauthorized; try again'));
     return;
   }
 
-  $reply = with_write_db(function($db_w) use ($reply_data) {
-    return put_reply_data($db_w, $reply_data);
+  $thread_or_reply = with_write_db(function($db_w) use ($thread_or_reply_data, $is_reply_post) {
+    return $is_reply_post ?
+        put_reply_data($db_w, $thread_or_reply_data) :
+        put_thread_data($db_w, $thread_or_reply_data);
   });
 
-  if (!$reply) {
-    echo render_html($title, render_publish_body_html($thread, $role, $reply_data,
-        'Something went wrong; try again'));
+  if (!$thread_or_reply) {
+    echo render_html($title, render_publish_body_html($board_or_thread, $role,
+        $thread_or_reply_data, 'Something went wrong; try again'));
     return;
   }
 
-  header('Location: ' . $reply['href']);
+  header('Location: ' . $thread_or_reply['href']);
 }
 
-// This can probably be merged with the thread_publish above
-function post_board_publish($params, $data, $role) { global $config;
-  $thread_data = array_filter(array_merge($params, $data), function($key) {
-    return in_array($key, ['board_id', 'subject', 'message', 'ip']);
+function post_delete($params, $data, $role) { global $config;
+  $thread_or_reply_id = array_filter(array_merge($params, $data), function($key) {
+    return in_array($key, ['board_id', 'thread_id', 'reply_id']);
   }, ARRAY_FILTER_USE_KEY);
 
-  $board = fetch_board_data($params['board_id']);
-  $title = $board['board_id'] . ' / ' . $config['name'];
-
-  if (!$role) {
-    echo render_html($title, render_publish_body_html($board, $role, $thread_data,
-        'Unauthorized; try again'));
-    return;
-  }
-
-  $thread = with_write_db(function($db_w) use ($thread_data) {
-    return put_thread_data($db_w, $thread_data);
-  });
-
-  if (!$thread) {
-    echo render_html($title, render_publish_body_html($board, $role, $thread_data,
-        'Something went wrong; try again'));
-    return;
-  }
-
-  header('Location: ' . $thread['href']);
+  // If thread, nuke all replies, nuke thread, stitch prev to next
+  // If reply, nuke reply, stitch prev to next; tombstone?
+  // Can be handled by delete_thread/reply_data
 }
 
 function get_thread($params, $data, $role) { global $config;
@@ -592,11 +580,11 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
   $routes['GET#/'] = 'get_root';
   $routes['GET#/_debug'] = 'debug';
   $routes['GET#/%board_id%/'] = 'get_board';
-  $routes['POST#/%board_id%/publish'] = 'post_board_publish';
-  $routes['POST#/%board_id%/delete'] = 'post_board_delete';
+  $routes['POST#/%board_id%/publish'] = 'post_publish';
+  $routes['POST#/%board_id%/delete'] = 'post_delete';
   $routes['GET#/%board_id%/t/%thread_id%'] = 'get_thread';
-  $routes['POST#/%board_id%/t/%thread_id%/publish'] = 'post_thread_publish';
-  $routes['POST#/%board_id%/t/%thread_id%/delete'] = 'post_thread_delete';
+  $routes['POST#/%board_id%/t/%thread_id%/publish'] = 'post_publish';
+  $routes['POST#/%board_id%/t/%thread_id%/delete'] = 'post_delete';
 
   $thread_regex = '(?P<thread_id>\d+)';
   $page_number_regex = '(?P<page_number>\d+)';
