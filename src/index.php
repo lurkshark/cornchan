@@ -29,6 +29,7 @@ if (!file_exists($config['dba_path'])) {
     dba_replace($board_id . '#thread_head.next_thread_id', 'thread_tail', $db_c);
     dba_replace($board_id . '#thread_tail.prev_thread_id', 'thread_head', $db_c);
   }
+  echo '<pre>' . $admin . '</pre>';
   // Close after db initialization
   dba_close($db_c);
 }
