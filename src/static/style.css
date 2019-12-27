@@ -47,28 +47,38 @@ hr {
   background-color: #ffcccc;
 }
 
-#new-post {
+form {
   max-width: 620px;
-}
-#new-post form {
   display: grid;
   grid-template-columns: 1fr 4fr;
   gap: 0.5em;
 }
-#new-post label {
+form label {
   grid-column: 1 / 2;
   text-align: right;
 }
-#new-post input,
-#new-post textarea,
-#new-post button {
+form input,
+form textarea,
+form button {
   grid-column: 2 / 3;
   padding: 0.25em;
 }
-#new-post textarea {
+form textarea {
   height: 8em;
 }
+
+form.delete-post-inline {
+  display: inline-block;
+}
+form.delete-post-inline button {
+  font-size: 0.85em;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
 #captcha-answer {
   text-transform: uppercase;
   border: 1px solid;
 }
+

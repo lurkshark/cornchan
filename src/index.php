@@ -17,12 +17,13 @@ if (!file_exists($config['dba_path'])) {
   $db_c = dba_open($config['dba_path'], 'c', $config['dba_handler'])
     or exit('Can\'t initialize a new db file!');
 
+  $admin = bin2hex(random_bytes(8));
   $board_ids = ['corn', 'meta', 'news'];
   dba_replace('_metadata.id', '999', $db_c);
   dba_replace('_config.name', 'cornchan', $db_c);
   dba_replace('_config.board_ids', json_encode($board_ids), $db_c);
-  dba_replace('_config.admin', hash('sha256', bin2hex(random_bytes(4))), $db_c);
   dba_replace('_config.secret', bin2hex(random_bytes(32)), $db_c);
+  dba_replace('_config.admin', hash('sha256', $admin), $db_c);
   foreach ($board_ids as $board_id) {
     dba_replace($board_id . '.thread_count', '0', $db_c);
     dba_replace($board_id . '#thread_head.next_thread_id', 'thread_tail', $db_c);
@@ -58,31 +59,6 @@ function verify_token($tag, $token, $hours = 1) { global $config;
   return hash_hmac('sha256', $expected_message, $config['secret']) == $hmac;
 }
 
-function set_role($role) {
-  if (!in_array($role, ['_ok', '_moderator', '_admin'])) return;
-  setcookie('role', $role . '.' . generate_token($role), 0, '/');
-}
-
-function get_role($cookies) {
-  if (empty($cookies['role'])) return false;
-  $role_cookie = explode('.', $cookies['role']);
-  $role_cookie_token = implode('.', array_slice($role_cookie, 1));
-  if (($role_cookie[0] === '_ok' && verify_token('_ok', $role_cookie_token, 3))
-      || ($role_cookie[0] === '_moderator' && verify_token('_moderator', $role_cookie_token, 6))
-      || ($role_cookie[0] === '_admin' && verify_token('_admin', $role_cookie_token, 12))) {
-    return $role_cookie[0];
-  }
-  return false;
-}
-
-function fetch_role($data) { global $db;
-  if (empty($data['password'])) return false;
-  $hashed_password = hash('sha256', $data['password']);
-  if ($hashed_password === dba_fetch('_config.admin', $db)) {
-    return '_admin';
-  }
-  return false;
-}
 
 $config['csrf'] = generate_token('_csrf');
 
@@ -136,7 +112,7 @@ function render_captcha_form_fragment_html() { global $config;
   <?php return ob_get_clean();
 }
 
-function render_new_post_form_fragment_html($board_or_thread, $role, $prefill = array()) { global $config;
+function render_publish_form_fragment_html($board_or_thread, $trust, $prefill = array()) { global $config;
   $form_action = '/' . $board_or_thread['board_id'];
   if (!empty($board_or_thread['thread_id'])) $form_action .= '/t/' . $board_or_thread['thread_id'];
   $form_action .= '/publish';
@@ -150,16 +126,29 @@ function render_new_post_form_fragment_html($board_or_thread, $role, $prefill = 
         <?php } ?>
         <label for="message">Message</label>
         <textarea name="message" id="message" class="new-post-message"><?php echo $prefill['message']; ?></textarea>
-        <?php if (!$role) echo render_captcha_form_fragment_html(); ?>
+        <?php if (!$trust) echo render_captcha_form_fragment_html(); ?>
         <!-- <label for="password">Password</label>
         <input type="text" name="password" id="password"
             autocomplete="off" class="new-post-password"> -->
         <button class="new-post-submit">Submit</button>
         <input type="hidden" name="csrf_token" value="<?php echo $config['csrf']; ?>">
-        <input type="hidden" name="board_id" value="<?php echo $board_or_thread['board_id']; ?>">
         <input type="hidden" name="thread_id" value="<?php echo $board_or_thread['thread_id']; ?>">
       </form>
     </section>
+  <?php return ob_get_clean();
+}
+
+function render_inline_delete_form_fragment_html($thread_or_reply) { global $config;
+  $form_action = '/' . $thread_or_reply['board_id'];
+  if (!empty($thread_or_reply['reply_id'])) $form_action .= '/t/' . $thread_or_reply['thread_id'];
+  $form_action .= '/delete';
+  ob_start(); ?>
+    <form method="post" action="<?php echo $form_action; ?>" class="delete-post-inline">
+      <input type="hidden" name="csrf_token" value="<?php echo $config['csrf']; ?>">
+      <input type="hidden" name="reply_id" value="<?php echo $thread_or_reply['reply_id']; ?>">
+      <input type="hidden" name="thread_id" value="<?php echo $thread_or_reply['thread_id']; ?>">
+      <button class="delete-post-submit">⌫</button>
+    </form>
   <?php return ob_get_clean();
 }
 
@@ -184,6 +173,7 @@ function render_reply_fragment_html($reply) {
           <span class="post-tag"><?php echo render_post_tag_fragment_html($reply['tag']); ?></span>
           <span class="post-name"><?php echo render_text($reply['name'], false); ?></span>
           <time class="post-time"><?php echo date('Y-m-d H:i', $reply['time']); ?></time>
+          <?php echo render_inline_delete_form_fragment_html($reply); ?>
         </div>
         <div class="post-message">
           <?php echo render_text($reply['message']); ?>
@@ -202,6 +192,7 @@ function render_thread_fragment_html($thread) {
         <span class="post-tag"><?php echo render_post_tag_fragment_html($thread['tag']); ?></span>
         <span class="post-name"><?php echo render_text($thread['name'], false); ?></span>
         <time class="post-time"><?php echo date('Y-m-d H:i', $thread['time']); ?></time>
+        <?php echo render_inline_delete_form_fragment_html($thread); ?>
       </header>
       <div class="post-message">
         <?php echo render_text($thread['message']); ?>
@@ -213,7 +204,7 @@ function render_thread_fragment_html($thread) {
   <?php return ob_get_clean();
 }
 
-function render_publish_body_html($board_or_thread, $role, $prefill, $toast) {
+function render_publish_body_html($board_or_thread, $trust, $prefill, $toast) {
   $headline = !empty($board_or_thread['thread_id']) ?
       $board_or_thread['board_id'] . ' / ' . $board_or_thread['thread_id'] :
       $board_or_thread['board_id'];
@@ -223,11 +214,38 @@ function render_publish_body_html($board_or_thread, $role, $prefill, $toast) {
     </header>
     <hr>
     <div class="toast"><?php echo $toast; ?></div>
-    <?php echo render_new_post_form_fragment_html($board_or_thread, $role, $prefill); ?>
+    <?php echo render_publish_form_fragment_html($board_or_thread, $trust, $prefill); ?>
   <?php return ob_get_clean();
 }
 
-function render_thread_body_html($thread, $role) {
+function render_delete_body_html($thread_or_reply, $trust, $prefill, $toast) { global $config;
+  $headline = !empty($thread_or_reply['thread_id']) ?
+      $thread_or_reply['board_id'] . ' / ' . $thread_or_reply['thread_id'] :
+      $thread_or_reply['board_id'];
+  $form_action = '/' . $thread_or_reply['board_id'];
+  if (!empty($thread_or_reply['reply_id'])) $form_action .= '/t/' . $thread_or_reply['thread_id'];
+  $form_action .= '/delete';
+  ob_start(); ?>
+    <header>
+      <h1 class="title"><?php echo $headline; ?></h1>
+    </header>
+    <hr>
+    <div class="toast"><?php echo $toast; ?></div>
+    <section id="delete-post">
+      <form method="post" action="<?php echo $form_action; ?>" class="delete-post">
+      <label for="password">Password</label>
+        <input type="password" name="password" id="password" class="delete-post-password">
+        <input type="hidden" name="csrf_token" value="<?php echo $config['csrf']; ?>">
+        <input type="hidden" name="thread_id" value="<?php echo $prefill['thread_id']; ?>">
+        <input type="hidden" name="reply_id" value="<?php echo $prefill['reply_id']; ?>">
+        <?php if (!$trust) echo render_captcha_form_fragment_html(); ?>
+        <button class="delete-post-submit">Delete</button>
+      </form>
+    </section>
+  <?php return ob_get_clean();
+}
+
+function render_thread_body_html($thread, $trust) {
   ob_start(); ?>
     <header>
       <h1 class="title"><?php echo $thread['thread_id']; ?> / <?php echo $thread['board_id']; ?></h1>
@@ -235,11 +253,11 @@ function render_thread_body_html($thread, $role) {
     <hr>
     <?php echo render_thread_fragment_html($thread); ?>
     <hr>
-    <?php echo render_new_post_form_fragment_html($thread, $role); ?>
+    <?php echo render_publish_form_fragment_html($thread, $trust); ?>
   <?php return ob_get_clean();
 }
 
-function render_board_body_html($board, $role) {
+function render_board_body_html($board, $trust) {
   ob_start(); ?>
     <header>
       <h1 class="title"><?php echo $board['board_id']; ?></h1>
@@ -249,7 +267,7 @@ function render_board_body_html($board, $role) {
       <?php echo render_thread_fragment_html($thread); ?>
     <?php } ?>
     <hr>
-    <?php echo render_new_post_form_fragment_html($board, $role); ?>
+    <?php echo render_publish_form_fragment_html($board, $trust); ?>
   <?php return ob_get_clean();
 }
 
@@ -391,6 +409,51 @@ function put_thread_data($db_w, $thread) { global $config;
   return $persisted;
 }
 
+function delete_reply_data($db_w, $reply) {
+  $reply = fetch_reply_data($reply['board_id'], $reply['thread_id'], $reply['reply_id']);
+  if (!$reply) return;
+
+  $attributes = ['board_id', 'thread_id', 'reply_id', 'time',
+      'message', 'next_reply_id', 'prev_reply_id', 'ip'];
+  foreach ($attributes as $attribute) {
+    dba_delete($reply['key'] . '.' . $attribute, $db_w);
+  }
+
+  $thread_key = $reply['board_id'] . '#' . $reply['thread_id'];
+  $prev_reply_key = $thread_key . '#' . $reply['prev_reply_id'];
+  $next_reply_key = $thread_key . '#' . $reply['next_reply_id'];
+  dba_replace($prev_reply_key . '.next_reply_id', $reply['next_reply_id'], $db_w);
+  dba_replace($next_reply_key . '.prev_reply_id', $reply['prev_reply_id'], $db_w);
+  $thread_reply_count = intval(dba_fetch($thread_key . '.reply_count', $db_w));
+  dba_replace($thread_key . '.reply_count', $thread_reply_count - 1, $db_w);
+}
+
+function delete_thread_data($db_w, $thread) {
+  $thread = fetch_thread_data($thread['board_id'], $thread['thread_id']);
+  if (!$thread) return;
+
+  foreach ($thread['replies'] as $reply) {
+    delete_reply_data($db_w, $reply);
+  }
+
+  $attributes = ['board_id', 'thread_id', 'time', 'reply_count',
+      'subject', 'message', 'next_thread_id', 'prev_thread_id', 'ip'];
+  foreach ($attributes as $attribute) {
+    dba_delete($thread['key'] . '.' . $attribute, $db_w);
+  }
+
+  dba_delete($thread['key'] . '#reply_head.next_reply_id', $db_w);
+  dba_delete($thread['key'] . '#reply_tail.prev_reply_id', $db_w);
+
+  $board_id = $thread['board_id'];
+  $prev_thread_key = $board_id . '#' . $thread['prev_thread_id'];
+  $next_thread_key = $board_id . '#' . $thread['next_thread_id'];
+  dba_replace($prev_thread_key . '.next_thread_id', $thread['next_thread_id'], $db_w);
+  dba_replace($next_thread_key . '.prev_thread_id', $thread['prev_thread_id'], $db_w);
+  $board_thread_count = intval(dba_fetch($board_id . '.thread_count', $db_w));
+  dba_replace($board_id . '.thread_count', $board_thread_count - 1, $db_w);
+}
+
 function fetch_reply_data($board_id, $thread_id, $reply_id) { global $config, $db;
   $reply_key = $board_id . '#' . $thread_id . '#' . $reply_id; 
   $reply = ['board_id' => $board_id, 'thread_id' => $thread_id, 'reply_id' => $reply_id];
@@ -404,7 +467,6 @@ function fetch_reply_data($board_id, $thread_id, $reply_id) { global $config, $d
   $tag_source_data = $reply['ip'] . $reply['thread_id'];
   $reply['tag'] = hash_hmac('sha256', $tag_source_data, $config['secret']);
 
-  $reply['subject'] = dba_fetch($reply_key . '.subject', $db);
   $reply['message'] = dba_fetch($reply_key . '.message', $db);
   $reply['next_reply_id'] = dba_fetch($reply_key . '.next_reply_id', $db);
   $reply['prev_reply_id'] = dba_fetch($reply_key . '.prev_reply_id', $db);
@@ -463,7 +525,7 @@ function fetch_board_data($board_id) { global $config, $db;
   return $board;
 }
 
-function post_publish($params, $data, $role) { global $config;
+function post_publish($params, $data, $trust) { global $config;
   $thread_or_reply_data = array_filter(array_merge($params, $data), function($key) {
     return in_array($key, ['board_id', 'thread_id', 'subject', 'message', 'ip']);
   }, ARRAY_FILTER_USE_KEY);
@@ -476,8 +538,8 @@ function post_publish($params, $data, $role) { global $config;
   $title = $is_reply_post ? $board_or_thread['thread_id'] . ' / ' : '';
   $title .= $board_or_thread['board_id'] . ' / ' . $config['name'];
 
-  if (!$role) {
-    echo render_html($title, render_publish_body_html($board_or_thread, $role,
+  if (!$trust) {
+    echo render_html($title, render_publish_body_html($board_or_thread, $trust,
         $thread_or_reply_data, 'Unauthorized; try again'));
     return;
   }
@@ -489,7 +551,7 @@ function post_publish($params, $data, $role) { global $config;
   });
 
   if (!$thread_or_reply) {
-    echo render_html($title, render_publish_body_html($board_or_thread, $role,
+    echo render_html($title, render_publish_body_html($board_or_thread, $trust,
         $thread_or_reply_data, 'Something went wrong; try again'));
     return;
   }
@@ -497,43 +559,60 @@ function post_publish($params, $data, $role) { global $config;
   header('Location: ' . $thread_or_reply['href']);
 }
 
-function post_delete($params, $data, $role) { global $config;
-  $thread_or_reply_id = array_filter(array_merge($params, $data), function($key) {
+function post_delete($params, $data, $trust) { global $config;
+  $thread_or_reply_id = array_filter(array_merge($data, $params), function($key) {
     return in_array($key, ['board_id', 'thread_id', 'reply_id']);
   }, ARRAY_FILTER_USE_KEY);
+  $is_reply_delete = !empty($thread_or_reply_id['reply_id']);
 
-  // If thread, nuke all replies, nuke thread, stitch prev to next
-  // If reply, nuke reply, stitch prev to next; tombstone?
-  // Can be handled by delete_thread/reply_data
+  $board_or_thread = $is_reply_delete ?
+      fetch_thread_data($params['board_id'], $params['thread_id']) :
+      fetch_board_data($params['board_id']);
+  $title = $is_reply_delete ? $board_or_thread['thread_id'] . ' / ' : '';
+  $title .= $board_or_thread['board_id'] . ' / ' . $config['name'];
+
+  if ($trust !== '_admin') {
+    echo render_html($title, render_delete_body_html($board_or_thread, $trust,
+        $thread_or_reply_id, 'Unauthorized; try again'));
+    return;
+  }
+
+  with_write_db(function($db_w) use ($thread_or_reply_id, $is_reply_delete) {
+    return $is_reply_delete ?
+        delete_reply_data($db_w, $thread_or_reply_id) :
+        delete_thread_data($db_w, $thread_or_reply_id);
+  });
+
+  header('Location: ' . $board_or_thread['href']);
 }
 
-function get_thread($params, $data, $role) { global $config;
+function get_thread($params, $data, $trust) { global $config;
   $thread = fetch_thread_data($params['board_id'], $params['thread_id']);
-  if (!$thread) return error_404($params, $data, $role);
+  if (!$thread) return error_404($params, $data, $trust);
   $title = $thread['thread_id'] . ' / ' . $thread['board_id'] . ' / ' . $config['name'];
-  echo render_html($title, render_thread_body_html($thread, $role));
+  echo render_html($title, render_thread_body_html($thread, $trust));
 }
 
-function get_board($params, $data, $role) { global $config;
+function get_board($params, $data, $trust) { global $config;
   $board = fetch_board_data($params['board_id']);
   // This likely won't happen because the regex already checks
-  if (!$board) return error_404($params, $data, $role);
+  if (!$board) return error_404($params, $data, $trust);
   $title = $board['board_id'] . ' / ' . $config['name'];
-  echo render_html($title, render_board_body_html($board, $role));
+  echo render_html($title, render_board_body_html($board, $trust));
 }
 
-function get_root($params, $data, $role) { global $config;
+function get_root($params, $data, $trust) { global $config;
   echo render_html($config['name'], '');
 }
 
-function error_404($params, $data, $role) {
+function error_404($params, $data, $trust) {
   // echo render_html('404 / ' . $config['name'], '');
   echo '<h1>Error 404</h1>';
-  echo '<pre>'; var_dump(['error_404', $params, $data, $role]); echo '</pre>';
+  echo '<pre>'; var_dump(['error_404', $params, $data, $trust]); echo '</pre>';
 }
 
-function debug($params, $data, $role) { global $config, $db;
-  if (!$config['test_override']) return error_404($params, $data, $role);
+function debug($params, $data, $trust) { global $config, $db;
+  if (!$config['test_override']) return error_404($params, $data, $trust);
 
   $key = dba_firstkey($db);
   while ($key !== false) {
@@ -556,23 +635,63 @@ function middleware_verify_captcha($data) { global $config;
   return verify_token($captcha_answer, $captcha_token);
 }
 
-function middleware_role($method, $cookies, $data) { global $config, $db;
-  if (!middleware_verify_csrf($method, $data)) return false;
-  $fresh_role = fetch_role($data);
-  if ($fresh_role) {
-    set_role($fresh_role);
-    return $fresh_role;
+function middleware_get_existing_role($cookies) {
+  if (empty($cookies['role'])) return false;
+  $role_cookie = explode('.', $cookies['role']);
+  $role_cookie_token = implode('.', array_slice($role_cookie, 1));
+  if (in_array($role_cookie[0], ['_ok', '_admin'])
+      && (verify_token('_ok', $role_cookie_token, 3)
+        || verify_token('_admin', $role_cookie_token, 0))) {
+    return $role_cookie[0];
   }
-
-  $existing_role = get_role($cookies);
-  if ($existing_role) return $existing_role;
-
-  if (middleware_verify_captcha($data)) {
-    set_role('_ok');
-    return '_ok';
-  }
-
   return false;
+}
+
+function middleware_fetch_role($data) { global $config, $db;
+  if (empty($data['password'])) return false;
+  $hashed_password = hash('sha256', $data['password']);
+  $expected_hash = $config['test_override'] ?
+      hash('sha256', 'admin') : dba_fetch('_config.admin', $db);
+  return $hashed_password === $expected_hash ? '_admin' : false;
+}
+
+// Establishes a level of trust for the request. Returns false
+// when totally untrusted, otherwise returns the user's role name
+function middleware_establish_trust($method, $cookies, $data) { global $config, $db;
+  if (!middleware_verify_csrf($method, $data)) return false;
+  // If you don't have an existing role cookie and didn't post
+  // any new data, then there's no way for you to have a role
+  if (empty($cookies['role']) && empty($data)) return false;
+
+  // Existing role from cookie
+  $existing_role = middleware_get_existing_role($cookies);
+
+  // Verify any newly submitted captcha
+  $solved_captcha = middleware_verify_captcha($data);
+
+  // If you don't have an existing role and didn't successfully
+  // solve a captcha then there's nothing more you can do
+  if (!$existing_role && !$solved_captcha) return false;
+
+  // If you have an existing role or solved a captcha and you've
+  // submitted a password, then we'll see if you get admin
+  $fresh_role = middleware_fetch_role($data);
+
+  // If you freshly posted admin
+  if ($fresh_role) {
+    // then update your role and return
+    setcookie('role', $fresh_role . '.' . generate_token($fresh_role), 0, '/');
+    return $fresh_role;
+  // Otherwise if you had an existing role
+  } elseif ($existing_role) {
+    // then just return it
+    return $existing_role;
+  }
+
+  // If you only solved a captcha
+  // then assign basic trust
+  setcookie('role', '_ok' . '.' . generate_token('_ok'), 0, '/');
+  return '_ok';
 }
 
 function entrypoint($method, $path, $cookies, $data) { global $config;
@@ -607,15 +726,15 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
         return in_array($key, ['board_id', 'page_number', 'thread_id']);
       }, ARRAY_FILTER_USE_KEY);
       $data['ip'] = $data['REMOTE_ADDR'];
-      $role = middleware_role($method, $cookies, $data);
+      $trust = middleware_establish_trust($method, $cookies, $data);
       // Call the function for this route with all the data
-      call_user_func($route_handler, $params, $data, $role);
+      call_user_func($route_handler, $params, $data, $trust);
       return;
     }
   }
 
   // Error if we get through all the routes without finding a match
-  error_404([$path], $cookies, $data);
+  error_404($params, $data, $trust);
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
