@@ -219,12 +219,12 @@ function render_publish_body_html($board_or_thread, $trust, $prefill, $toast) {
   <?php return ob_get_clean();
 }
 
-function render_delete_body_html($thread_or_reply, $trust, $prefill, $toast) { global $config;
-  $headline = !empty($thread_or_reply['thread_id']) ?
-      $thread_or_reply['board_id'] . ' / ' . $thread_or_reply['thread_id'] :
-      $thread_or_reply['board_id'];
-  $form_action = '/' . $thread_or_reply['board_id'];
-  if (!empty($thread_or_reply['reply_id'])) $form_action .= '/t/' . $thread_or_reply['thread_id'];
+function render_delete_body_html($board_or_thread, $trust, $prefill, $toast) { global $config;
+  $headline = !empty($board_or_thread['thread_id']) ?
+      $board_or_thread['board_id'] . ' / ' . $board_or_thread['thread_id'] :
+      $board_or_thread['board_id'];
+  $form_action = '/' . $board_or_thread['board_id'];
+  if (!empty($prefill['reply_id'])) $form_action .= '/t/' . $board_or_thread['thread_id'];
   $form_action .= '/delete';
   ob_start(); ?>
     <header>
@@ -527,7 +527,7 @@ function fetch_board_data($board_id) { global $config, $db;
 }
 
 function post_publish($params, $data, $trust) { global $config;
-  $thread_or_reply_data = array_filter(array_merge($params, $data), function($key) {
+  $thread_or_reply_data = array_filter(array_merge($data, $params), function($key) {
     return in_array($key, ['board_id', 'thread_id', 'subject', 'message', 'ip']);
   }, ARRAY_FILTER_USE_KEY);
   // This post is a reply if there is a thread_id
