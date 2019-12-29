@@ -18,7 +18,7 @@ if (!file_exists($config['dba_path'])) {
     or exit('Can\'t initialize a new db file!');
 
   $admin = bin2hex(random_bytes(8));
-  $board_ids = ['corn', 'meta', 'news'];
+  $board_ids = ['corn', 'prog', 'news'];
   dba_replace('_metadata.id', '999', $db_c);
   dba_replace('_config.name', 'cornchan', $db_c);
   dba_replace('_config.board_ids', json_encode($board_ids), $db_c);
@@ -148,7 +148,7 @@ function render_inline_delete_form_fragment_html($thread_or_reply) { global $con
       <input type="hidden" name="csrf_token" value="<?php echo $config['csrf']; ?>">
       <input type="hidden" name="reply_id" value="<?php echo $thread_or_reply['reply_id']; ?>">
       <input type="hidden" name="thread_id" value="<?php echo $thread_or_reply['thread_id']; ?>">
-      <button class="delete-post-submit">⌫</button>
+      <button class="delete-post-submit">&#9003;</button>
     </form>
   <?php return ob_get_clean();
 }
@@ -610,6 +610,16 @@ function error_404($params, $data, $trust) {
   // echo render_html('404 / ' . $config['name'], '');
   echo '<h1>Error 404</h1>';
   echo '<pre>'; var_dump(['error_404', $params, $data, $trust]); echo '</pre>';
+}
+
+function install() {
+  $preconditions = array();
+  $preconditions['gd_extension'] = extension_loaded('gd');
+  $preconditions['gd_types'] = $preconditions['gd_extension'] ?
+      gd_info()['PNG Support'] : false;
+  $preconditions['dba_extension'] = extension_loaded('dba');
+  $preconditions['dba_handler'] = $preconditions['dba_extension'] ?
+      in_array('lmdb', dba_handlers()) || in_array('gdbm', dba_handlers()) : false;
 }
 
 function debug($params, $data, $trust) { global $config, $db;
