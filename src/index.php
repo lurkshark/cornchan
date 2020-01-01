@@ -1,45 +1,22 @@
 <?php // Gentlemen, behold...
 $config = array(); // CORNCHAN
-header('X-Powered-By: Corn v0.6');
-extension_loaded('dba') or exit('The dba extension is not available!');
-in_array('lmdb', dba_handlers())
-  or in_array('gdbm', dba_handlers())
-  or exit('Neither lmdb or gdbm implementations are available for dba!');
-$config['dba_handler'] = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'gdbm';
-// Use the override when provided (e.g. Travis CI) otherwise use the HOME dir
-$config['dba_path'] = ($_ENV['CORN_DBA_PATH_OVERRIDE'] ?? $_ENV['HOME']) . 'cornchan.db';
+define('CORN_VERSION', '0.7.1');
+header('X-Powered-By: Corn v' . CORN_VERSION);
+$config['installed'] = @include('config.php');
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
-$config['anonymous'] = 'Cornonymous';
-$config['language'] = 'en';
+$config['dba_handler'] = defined('CORN_DBA_HANDLER') ? CORN_DBA_HANDLER : NULL;
+$config['dba_path'] = defined('CORN_DBA_PATH') ?
+    CORN_DBA_PATH : $_SERVER['DOCUMENT_ROOT'] . '/cornchan.db';
 
-// Create the db if it doesn't exist
-if (!file_exists($config['dba_path'])) {
-  $db_c = dba_open($config['dba_path'], 'c', $config['dba_handler'])
-    or exit('Can\'t initialize a new db file!');
-
-  $admin = bin2hex(random_bytes(8));
-  $board_ids = ['corn', 'prog', 'news'];
-  dba_replace('_metadata.id', '999', $db_c);
-  dba_replace('_config.name', 'cornchan', $db_c);
-  dba_replace('_config.board_ids', json_encode($board_ids), $db_c);
-  dba_replace('_config.secret', bin2hex(random_bytes(32)), $db_c);
-  dba_replace('_config.admin', hash('sha256', $admin), $db_c);
-  foreach ($board_ids as $board_id) {
-    dba_replace($board_id . '.thread_count', '0', $db_c);
-    dba_replace($board_id . '#thread_head.next_thread_id', 'thread_tail', $db_c);
-    dba_replace($board_id . '#thread_tail.prev_thread_id', 'thread_head', $db_c);
-  }
-  echo '<pre>' . $admin . '</pre>';
-  // Close after db initialization
-  dba_close($db_c);
+$db = $config['installed'] ? dba_open($config['dba_path'], 'r', $config['dba_handler']) : NULL;
+foreach (['name', 'language', 'anonymous', 'board_ids', 'secret', 'admin'] as $option) {
+  $config[$option] = $db ? dba_fetch('_config.' . $option, $db) : NULL;
 }
 
-// Open db for read and get config
-$db = dba_open($config['dba_path'], 'r', $config['dba_handler'])
-  or exit('Can\'t open the db file!');
-$config['board_ids'] = json_decode(dba_fetch('_config.board_ids', $db));
-$config['secret'] = dba_fetch('_config.secret', $db);
-$config['name'] = dba_fetch('_config.name', $db);
+$config['board_ids'] = $config['board_ids'] ? json_decode($config['board_ids']) : [];
+// Set the values that'll be used on the install page
+$config['language'] = $config['language'] ?? 'en';
+$config['name'] = $config['name'] ?? 'cornchan';
 
 // Returns a HMAC token
 function generate_token($tag) { global $config;
@@ -272,6 +249,60 @@ function render_board_body_html($board, $trust) {
   <?php return ob_get_clean();
 }
 
+function render_install($preconditions) { global $config;
+  $descriptions = array();
+  $descriptions['can_modify_files'] = [
+      true => 'Files can be written and deleted on your server',
+      false => 'Cannot write or delete files on your server'];
+  $descriptions['gd_extension'] = [
+      true => 'GD PHP extension is installed and supports the required filetypes',
+      false => 'GD PHP extension or a required filetype isn\'t installed'];
+  $descriptions['dba_extension'] =[
+      true => 'DBA PHP extension is installed and supports an acceptable handler',
+      false => 'DBA PHP extension isn\'t installed or doesn\'t have an acceptable handler'];
+  ob_start(); ?>
+    <header>
+      <h1 class="title">installation</h1>
+    </header>
+    <hr>
+    <section>
+      <?php foreach (array_keys($descriptions) as $condition) { ?>
+        <p>
+          <?php if ($preconditions[$condition]) { ?>
+            <span>&#128077;</span>
+          <?php } else { ?>
+            <span>&#9940;</span>
+          <?php } ?>
+          <?php echo $descriptions[$condition][$preconditions[$condition]]; ?>
+        </p>
+      <?php } ?>
+      <hr>
+      <?php if ($preconditions['can_create_db']) { ?>
+        <form method="post">
+          <label for="dba_path">DB File Path</label>
+          <input type="text" name="dba_path" value="<?php echo $config['dba_path']; ?>"
+              id="dba_path" autocomplete="off">
+          <label for="admin_password">Admin Password</label>
+          <input type="text" name="admin_password" value="<?php echo bin2hex(random_bytes(8)); ?>"
+              id="admin_password" autocomplete="off">
+          <label for="initial_boards">Initial Boards</label>
+          <input type="text" name="initial_boards" value="corn, prog, news"
+              id="initial_boards" autocomplete="off">
+          <label for="name">Board Name</label>
+          <input type="text" name="name" value="<?php echo $config['name']; ?>"
+              id="name" autocomplete="off">
+          <label for="language">Language</label>
+          <input type="text" name="language" value="<?php echo $config['language']; ?>"
+              id="language" autocomplete="off">
+          <button>Install</button>
+        </form>
+      <?php } else { ?>
+        <p>Please fix the issues above before continuing</p>
+      <?php } ?>
+    </section>
+  <?php return ob_get_clean();
+}
+
 function render_html($title, $body) { global $config;
   ob_start(); ?>
     <!DOCTYPE html>
@@ -302,7 +333,11 @@ function render_html($title, $body) { global $config;
         $exec_time = intval((microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000);
         $last_updated = date('Y-m-d H:i', filemtime(__FILE__)); ?>
       <footer class="footer">
-        <small><?php echo $last_updated; ?> / <?php echo $exec_time; ?>ms</small>
+        <small>
+          <?php echo CORN_VERSION; ?> /
+          <?php echo $last_updated; ?> /
+          <?php echo $exec_time; ?>ms
+        </small>
       </footer>
     </body>
     </html>
@@ -612,14 +647,58 @@ function error_404($params, $data, $trust) {
   echo '<pre>'; var_dump(['error_404', $params, $data, $trust]); echo '</pre>';
 }
 
-function install() {
+function install($data) {
   $preconditions = array();
-  $preconditions['gd_extension'] = extension_loaded('gd');
-  $preconditions['gd_types'] = $preconditions['gd_extension'] ?
-      gd_info()['PNG Support'] : false;
-  $preconditions['dba_extension'] = extension_loaded('dba');
-  $preconditions['dba_handler'] = $preconditions['dba_extension'] ?
-      in_array('lmdb', dba_handlers()) || in_array('gdbm', dba_handlers()) : false;
+  $test_file = $data['DOCUMENT_ROOT'] . '/test';
+  $preconditions['can_modify_files'] = touch($test_file) && @unlink($test_file);
+  $preconditions['gd_extension'] = extension_loaded('gd') && gd_info()['PNG Support'];
+  $preconditions['dba_extension'] = extension_loaded('dba')
+      && (in_array('lmdb', dba_handlers()) || in_array('gdbm', dba_handlers()));
+  $preconditions['can_create_db'] = $preconditions['can_modify_files']
+      && $preconditions['gd_extension'] && $preconditions['dba_extension'];
+
+  if ($preconditions['can_create_db'] && $data['REQUEST_METHOD'] === 'POST') {
+    $dba_handler = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'gdbm';
+    // First create the static config file
+    $config_file_data = '<?php
+        define(\'CORN_DBA_PATH\', \'' . $data['dba_path'] . '\');
+        define(\'CORN_DBA_HANDLER\', \'' . $dba_handler . '\');
+        return true; ?>';
+    file_put_contents('config.php', $config_file_data)
+      or exit('Can\'t write config file!');
+
+    // Now initialize the db file
+    $db_c = dba_open($data['dba_path'], 'c', $dba_handler)
+      or exit('Can\'t initialize a new db file!');
+
+    // Explode and trim the initial boards
+    $board_ids = array_map(function($board_id) {
+      return trim($board_id);
+    }, explode(',', $data['initial_boards']));
+
+    // Put all the expected keys
+    dba_replace('_metadata.id', '999', $db_c);
+    dba_replace('_config.name', $data['name'], $db_c);
+    dba_replace('_config.anonymous', 'Cornonymous', $db_c);
+    dba_replace('_config.language', $data['language'], $db_c);
+    dba_replace('_config.board_ids', json_encode($board_ids), $db_c);
+    dba_replace('_config.admin', hash('sha256', $data['admin_password']), $db_c);
+    dba_replace('_config.secret', bin2hex(random_bytes(32)), $db_c);
+    foreach ($board_ids as $board_id) {
+      dba_replace($board_id . '.thread_count', '0', $db_c);
+      dba_replace($board_id . '#thread_head.next_thread_id', 'thread_tail', $db_c);
+      dba_replace($board_id . '#thread_tail.prev_thread_id', 'thread_head', $db_c);
+    }
+
+    // Close after db initialization
+    dba_close($db_c);
+
+    // Redirect to root
+    header('Location: /');
+    return;
+  }
+
+  echo render_html('installation / cornchan', render_install($preconditions));
 }
 
 function debug($params, $data, $trust) { global $config, $db;
@@ -658,12 +737,10 @@ function middleware_get_existing_role($cookies) {
   return false;
 }
 
-function middleware_fetch_role($data) { global $config, $db;
+function middleware_fetch_role($data) { global $config;
   if (empty($data['password'])) return false;
   $hashed_password = hash('sha256', $data['password']);
-  $expected_hash = $config['test_override'] ?
-      hash('sha256', 'admin') : dba_fetch('_config.admin', $db);
-  return $hashed_password === $expected_hash ? '_admin' : false;
+  return $hashed_password === $config['admin'] ? '_admin' : false;
 }
 
 // Establishes a level of trust for the request. Returns false
@@ -719,6 +796,11 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
   $thread_regex = '(?P<thread_id>\d+)';
   $page_number_regex = '(?P<page_number>\d+)';
   $board_regex = '(?P<board_id>' . implode('|', $config['board_ids']) . ')';
+
+  if (!@file_exists('config.php')) {
+    install($data);
+    return;
+  }
 
   foreach ($routes as $route_def => $route_handler) {
     list($route_method, $route_regex) = explode('#', $route_def);

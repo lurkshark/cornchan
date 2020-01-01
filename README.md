@@ -18,6 +18,14 @@ location / {
 }
 ```
 
+### Troubleshooting
+
+#### Cannot write or delete files on your server
+
+#### GD PHP extension or a required filetype isn't installed
+
+#### DBA PHP extension isn't installed or doesn't have an acceptable handler
+
 ## Development
 The guiding principle of this project is to be as cheap and easy as possible to deploy while still maintaining a high level of quality. In practice this means targeting shared hosting with no RDBMS, and requiring as few files as possible to deploy. The ideal setup is a single `index.php` file that takes care of everything.
 
