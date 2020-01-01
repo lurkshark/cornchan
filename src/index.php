@@ -3,7 +3,7 @@ $config = array(); // CORNCHAN
 define('CORN_VERSION', '0.7.1');
 header('X-Powered-By: Corn v' . CORN_VERSION);
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
-$config['config_location'] = $config['test_override'] ? '/tmp' : $_SERVER['DOCUMENT_ROOT'];
+$config['config_location'] = $config['test_override'] ? '/tmp' : $_ENV['HOME'];
 $config['installed'] = @include($config['config_location'] . '/config.php');
 
 $db = $config['installed'] ? dba_open(CORN_DBA_PATH, 'r', CORN_DBA_HANDLER) : NULL;
