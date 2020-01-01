@@ -2,13 +2,11 @@
 $config = array(); // CORNCHAN
 define('CORN_VERSION', '0.7.1');
 header('X-Powered-By: Corn v' . CORN_VERSION);
-$config['installed'] = @include('config.php');
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
-$config['dba_handler'] = defined('CORN_DBA_HANDLER') ? CORN_DBA_HANDLER : NULL;
-$config['dba_path'] = defined('CORN_DBA_PATH') ?
-    CORN_DBA_PATH : $_SERVER['DOCUMENT_ROOT'] . '/cornchan.db';
+$config['config_location'] = $config['test_override'] ? '/tmp' : $_SERVER['DOCUMENT_ROOT'];
+$config['installed'] = @include($config['config_location'] . '/config.php');
 
-$db = $config['installed'] ? dba_open($config['dba_path'], 'r', $config['dba_handler']) : NULL;
+$db = $config['installed'] ? dba_open(CORN_DBA_PATH, 'r', CORN_DBA_HANDLER) : NULL;
 foreach (['name', 'language', 'anonymous', 'board_ids', 'secret', 'admin'] as $option) {
   $config[$option] = $db ? dba_fetch('_config.' . $option, $db) : NULL;
 }
@@ -280,7 +278,8 @@ function render_install($preconditions) { global $config;
       <?php if ($preconditions['can_create_db']) { ?>
         <form method="post">
           <label for="dba_path">DB File Path</label>
-          <input type="text" name="dba_path" value="<?php echo $config['dba_path']; ?>"
+          <input type="text" name="dba_path"
+              value="<?php echo $config['config_location'] . '/cornchan.db'; ?>"
               id="dba_path" autocomplete="off">
           <label for="admin_password">Admin Password</label>
           <input type="text" name="admin_password" value="<?php echo bin2hex(random_bytes(8)); ?>"
@@ -346,10 +345,10 @@ function render_html($title, $body) { global $config;
 
 function with_write_db($func) { global $config, $db;
   dba_close($db); // Close the db for reads and reopen for writes
-  $db = $db_w = dba_open($config['dba_path'], 'w', $config['dba_handler']);
+  $db = $db_w = dba_open(CORN_DBA_PATH, 'w', CORN_DBA_HANDLER);
   $out = $func($db_w); // Execute the callback with the writable db handle
   dba_close($db_w); // Close the db for writes and reopen for reads
-  $db = dba_open($config['dba_path'], 'r', $config['dba_handler']);
+  $db = dba_open(CORN_DBA_PATH, 'r', CORN_DBA_HANDLER);
   return $out;
 }
 
@@ -647,10 +646,10 @@ function error_404($params, $data, $trust) {
   echo '<pre>'; var_dump(['error_404', $params, $data, $trust]); echo '</pre>';
 }
 
-function install($data) {
+function install($data) { global $config;
   $preconditions = array();
-  $test_file = $data['DOCUMENT_ROOT'] . '/test';
-  $preconditions['can_modify_files'] = touch($test_file) && @unlink($test_file);
+  $test_file = $config['config_location'] . '/test';
+  $preconditions['can_modify_files'] = @touch($test_file) && @unlink($test_file);
   $preconditions['gd_extension'] = extension_loaded('gd') && gd_info()['PNG Support'];
   $preconditions['dba_extension'] = extension_loaded('dba')
       && (in_array('lmdb', dba_handlers()) || in_array('gdbm', dba_handlers()));
@@ -664,7 +663,7 @@ function install($data) {
         define(\'CORN_DBA_PATH\', \'' . $data['dba_path'] . '\');
         define(\'CORN_DBA_HANDLER\', \'' . $dba_handler . '\');
         return true; ?>';
-    file_put_contents('config.php', $config_file_data)
+    file_put_contents($config['config_location'] . '/config.php', $config_file_data)
       or exit('Can\'t write config file!');
 
     // Now initialize the db file
@@ -797,7 +796,7 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
   $page_number_regex = '(?P<page_number>\d+)';
   $board_regex = '(?P<board_id>' . implode('|', $config['board_ids']) . ')';
 
-  if (!@file_exists('config.php')) {
+  if (!$config['installed']) {
     install($data);
     return;
   }
