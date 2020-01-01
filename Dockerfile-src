@@ -10,5 +10,4 @@ RUN apt-get update && apt-get install -y \
   && a2enmod rewrite \
   && a2enmod headers
 # Override for Travis CI build
-ENV CORN_DBA_PATH_OVERRIDE /tmp/
 ENV CORN_TEST_OVERRIDE true
