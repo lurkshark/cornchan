@@ -29,3 +29,5 @@ EOF
 
 # Nuke DB while still testing
 rm /home/protected/cornchan.db
+rm /home/protected/config.php
+
