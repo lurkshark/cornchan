@@ -28,6 +28,6 @@ https://raw.githubusercontent.com/lurkshark/cornchan/master/src/static/wild.css
 EOF
 
 # Nuke DB while still testing
-rm /home/protected/cornchan.db
-rm /home/protected/config.php
+#rm /home/protected/cornchan.db
+#rm /home/protected/config.php
 

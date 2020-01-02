@@ -32,3 +32,16 @@ def lorem_ipsum(words)
       "sociis", "natoque", "penatibus", "et"].sample
   end.join(" ").capitalize
 end
+
+def post_reply
+  visit "/corn/"
+  find_all(".thread a.post-id").last.click
+  within("#new-post") do
+    fill_in "message", with: lorem_ipsum(64)
+    if page.has_field?("captcha_answer")
+      fill_in "captcha_answer", with: "GOODCAPTCHA"
+    end
+    click_button "Submit"
+  end
+end
+
