@@ -5,6 +5,7 @@ header('X-Powered-By: Corn v' . CORN_VERSION);
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
 $config['config_location'] = $config['test_override'] ? '/tmp' : $_ENV['HOME'];
 $config['installed'] = @include($config['config_location'] . '/config.php');
+$config['remote_addr'] = $_SERVER['REMOTE_ADDR'];
 
 $db = $config['installed'] ? dba_open(CORN_DBA_PATH, 'r', CORN_DBA_HANDLER) : NULL;
 foreach (['name', 'language', 'anonymous', 'board_ids', 'secret', 'admin'] as $option) {
@@ -36,7 +37,7 @@ function verify_token($tag, $token, $hours = 1) { global $config;
 }
 
 
-$config['csrf'] = generate_token('_csrf');
+$config['csrf'] = generate_token('_csrf' . $config['remote_addr']);
 
 function render_text($raw_message, $styling = true) { global $config;
   if (!$styling) return filter_var($raw_message, FILTER_SANITIZE_SPECIAL_CHARS);
@@ -397,7 +398,7 @@ function put_reply_data($db_w, $reply) { global $config;
   dba_replace($reply_key . '.reply_id', $reply_id, $db_w);
   dba_replace($reply_key . '.message', $reply['message'], $db_w);
   // dba_replace($reply_key . '.name', $reply['name'], $db_w);
-  dba_replace($reply_key . '.ip', $reply['ip'], $db_w);
+  dba_replace($reply_key . '.ip', $config['remote_addr'], $db_w);
   dba_replace($reply_key . '.time', time(), $db_w);
 
   $thread_reply_count = intval(dba_fetch($thread_key . '.reply_count', $db_w));
@@ -429,7 +430,7 @@ function put_thread_data($db_w, $thread) { global $config;
   dba_replace($thread_key . '.subject', $thread['subject'], $db_w);
   dba_replace($thread_key . '.message', $thread['message'], $db_w);
   // dba_replace($thread_key . '.name', $thread['name'], $db_w);
-  dba_replace($thread_key . '.ip', $thread['ip'], $db_w);
+  dba_replace($thread_key . '.ip', $config['remote_addr'], $db_w);
   dba_replace($thread_key . '.time', time(), $db_w);
 
   dba_replace($thread_key . '.reply_count', '0', $db_w);
@@ -562,7 +563,7 @@ function fetch_board_data($board_id) { global $config, $db;
 
 function post_publish($params, $data, $trust) { global $config;
   $thread_or_reply_data = array_filter(array_merge($data, $params), function($key) {
-    return in_array($key, ['board_id', 'thread_id', 'subject', 'message', 'ip']);
+    return in_array($key, ['board_id', 'thread_id', 'subject', 'message']);
   }, ARRAY_FILTER_USE_KEY);
   // This post is a reply if there is a thread_id
   $is_reply_post = !empty($thread_or_reply_data['thread_id']);
@@ -646,7 +647,7 @@ function error_404($params, $data, $trust) {
   echo '<pre>'; var_dump(['error_404', $params, $data, $trust]); echo '</pre>';
 }
 
-function install($data) { global $config;
+function install($method, $data) { global $config;
   $preconditions = array();
   $test_file = $config['config_location'] . '/test';
   $preconditions['can_modify_files'] = @touch($test_file) && @unlink($test_file);
@@ -656,7 +657,7 @@ function install($data) { global $config;
   $preconditions['can_create_db'] = $preconditions['can_modify_files']
       && $preconditions['gd_extension'] && $preconditions['dba_extension'];
 
-  if ($preconditions['can_create_db'] && $data['REQUEST_METHOD'] === 'POST') {
+  if ($preconditions['can_create_db'] && $method === 'POST') {
     $dba_handler = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'gdbm';
     // First create the static config file
     $config_file_data = '<?php
@@ -711,10 +712,10 @@ function debug($params, $data, $trust) { global $config, $db;
   }
 }
 
-function middleware_verify_csrf($method, $data) {
+function middleware_verify_csrf($method, $data) { global $config;
   if ($method === 'GET') return true;
   $csrf_token = $data['csrf_token'];
-  return verify_token('_csrf', $csrf_token);
+  return verify_token('_csrf' . $config['remote_addr'], $csrf_token);
 }
 
 function middleware_verify_captcha($data) { global $config;
@@ -797,7 +798,7 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
   $board_regex = '(?P<board_id>' . implode('|', $config['board_ids']) . ')';
 
   if (!$config['installed']) {
-    install($data);
+    install($method, $data);
     return;
   }
 
@@ -817,7 +818,6 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
       $params = array_filter($matches, function($key) {
         return in_array($key, ['board_id', 'page_number', 'thread_id']);
       }, ARRAY_FILTER_USE_KEY);
-      $data['ip'] = $data['REMOTE_ADDR'];
       $trust = middleware_establish_trust($method, $cookies, $data);
       // Call the function for this route with all the data
       call_user_func($route_handler, $params, $data, $trust);
@@ -831,4 +831,4 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-entrypoint($method, $path, $_COOKIE, array_merge($_SERVER, $_POST));
+entrypoint($method, $path, $_COOKIE, $_POST);
