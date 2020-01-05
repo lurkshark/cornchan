@@ -32,3 +32,34 @@ def lorem_ipsum(words)
       "sociis", "natoque", "penatibus", "et"].sample
   end.join(" ").capitalize
 end
+
+def post_reply(which = :oldest)
+  visit "/corn/"
+  threads = find_all(".thread a.post-id")
+  if which == :oldest
+    threads.last.click
+  else
+    threads.first.click
+  end
+
+  within("#new-post") do
+    fill_in "message", with: lorem_ipsum(64)
+    if page.has_field?("captcha_answer")
+      fill_in "captcha_answer", with: "GOODCAPTCHA"
+    end
+    click_button "Submit"
+  end
+end
+
+def post_thread
+  visit "/corn/"
+  within("#new-post") do
+    fill_in "subject", with: lorem_ipsum(5)
+    fill_in "message", with: lorem_ipsum(64)
+    if page.has_field?("captcha_answer")
+      fill_in "captcha_answer", with: "GOODCAPTCHA"
+    end
+    click_button "Submit"
+  end
+end
+

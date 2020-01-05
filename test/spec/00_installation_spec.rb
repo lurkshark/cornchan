@@ -10,7 +10,6 @@ feature "Installation page" do
   end
 
   scenario "takes initial configuration" do
-    fill_in "dba_path", with: "/tmp/cornchan.db"
     fill_in "admin_password", with: "admin"
     # Only filling-in fields that need
     # to be changed for tests
