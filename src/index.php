@@ -561,6 +561,22 @@ function fetch_board_data($board_id) { global $config, $db;
   return $board;
 }
 
+function fetch_overboard_data() { global $config, $db;
+  $boards = array_map(function($board_id) {
+    return fetch_board_data($board_id); 
+  }, $config['board_ids']);
+  $threads = array_merge(array_map(function($board) {
+    return $board['threads'];
+  }, $boards));
+  return usort($threads, function($thread_a, $thread_b) {
+    $time_a = empty($thread_a['replies']) ?
+        $thread_a['time'] : end($thread_a['replies'])['time'];
+    $time_b = empty($thread_b['replies']) ?
+        $thread_b['time'] : end($thread_b['replies'])['time'];
+    return $time_a - $time_b;
+  });
+}
+
 function post_publish($params, $data, $trust) { global $config;
   $thread_or_reply_data = array_filter(array_merge($data, $params), function($key) {
     return in_array($key, ['board_id', 'thread_id', 'subject', 'message']);
