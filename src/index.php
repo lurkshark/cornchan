@@ -248,6 +248,18 @@ function render_board_body_html($board, $trust) {
   <?php return ob_get_clean();
 }
 
+function render_overboard_body_html($overboard) {
+  ob_start(); ?>
+    <header>
+      <h1 class="title">recent</h1>
+    </header>
+    <?php foreach ($overboard['threads'] as $thread) { ?>
+      <hr>
+      <?php echo render_thread_fragment_html($thread); ?>
+    <?php } ?>
+  <?php return ob_get_clean();
+}
+
 function render_install($preconditions) { global $config;
   $descriptions = array();
   $descriptions['can_modify_files'] = [
@@ -561,6 +573,26 @@ function fetch_board_data($board_id) { global $config, $db;
   return $board;
 }
 
+function fetch_overboard_data() { global $config, $db;
+  $boards = array_map(function($board_id) {
+    return fetch_board_data($board_id);
+  }, $config['board_ids']);
+  $threads = call_user_func_array('array_merge', array_map(function($board) {
+    return $board['threads'];
+  }, $boards));
+  // Sorts in place
+  usort($threads, function($thread_a, $thread_b) {
+    $time_a = empty($thread_a['replies']) ?
+        $thread_a['time'] : end($thread_a['replies'])['time'];
+    $time_b = empty($thread_b['replies']) ?
+        $thread_b['time'] : end($thread_b['replies'])['time'];
+    return $time_b - $time_a;
+  });
+  $overboard = array();
+  $overboard['threads'] = $threads;
+  return $overboard;
+}
+
 function post_publish($params, $data, $trust) { global $config;
   $thread_or_reply_data = array_filter(array_merge($data, $params), function($key) {
     return in_array($key, ['board_id', 'thread_id', 'subject', 'message']);
@@ -638,7 +670,8 @@ function get_board($params, $data, $trust) { global $config;
 }
 
 function get_root($params, $data, $trust) { global $config;
-  echo render_html($config['name'], '');
+  $overboard = fetch_overboard_data();
+  echo render_html($config['name'], render_overboard_body_html($overboard));
 }
 
 function error_404($params, $data, $trust) {
