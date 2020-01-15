@@ -6,7 +6,10 @@ body {
 .top-bar a {
   color: #ccad00;
 }
-.logo {}
+.logo {
+  color: #000000!important;
+  text-decoration: none;
+}
 .logo::before {
   content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAhFBMVEUAAAB4qk1ckjt3slV3s1Vdkjx2sFT0jw/NmjeSs0x3slX0kAx3slV3s1RflT14slT2kw95s1Z5s1ZgmEH3kg1ekTzpsCx4sld7sFhppUt3slX0kAxckTv3uC2AsFD2rCL2ohr1mBL3tCn3sSf0kg1spUqMrUljmUHVpSirkyXPmSD1qB+UKs10AAAAGnRSTlMACvvt5N9FIQL91NS/lIuIh4NlSj08OjUdETITAPAAAACHSURBVBjTZYtHFsMwCAVxjdN7+2DLLf3+9wsyesnCs2IGICOK6c8lIhLRoTgdvCdAkokc55/S8cSXHfCQxrmuZQsEVLXr6pKZ6RfKRj2ESEPbD74JB5janldX9bOGp/lLJCOCwoZIbB8V93cotz1ZeCOQWggsU0B9EXSm89aHAsiBNQ3kNOYLxk8QZQPk45QAAAAASUVORK5CYII=);
   vertical-align: top;

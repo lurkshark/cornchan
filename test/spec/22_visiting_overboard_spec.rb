@@ -3,7 +3,19 @@ feature "Visiting the root overboard" do
     visit "/"
   end
 
-  scenario "shows recent threads and replies" do
-    expect(page).to have_css(".thread")
+  context "when posting a new thread" do
+    scenario "shows the new thread at the top" do
+      new_thread_subject = post_thread
+      visit "/"
+      expect(first(".thread .post-subject")).to have_text(new_thread_subject)
+    end
+  end
+
+  context "when posting a new reply" do
+    scenario "shows the replied-to thread at the top" do
+      bumped_thread_subject = post_reply(:oldest)
+      visit "/"
+      expect(first(".thread .post-subject")).to have_text(bumped_thread_subject)
+    end
   end
 end
