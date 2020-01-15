@@ -42,6 +42,7 @@ def post_reply(which = :oldest)
     threads.first.click
   end
 
+  subject = find(".thread .post-subject").text
   within("#new-post") do
     fill_in "message", with: lorem_ipsum(64)
     if page.has_field?("captcha_answer")
@@ -49,17 +50,20 @@ def post_reply(which = :oldest)
     end
     click_button "Submit"
   end
+  subject
 end
 
 def post_thread
   visit "/corn/"
+  subject = lorem_ipsum(5)
   within("#new-post") do
-    fill_in "subject", with: lorem_ipsum(5)
+    fill_in "subject", with: subject
     fill_in "message", with: lorem_ipsum(64)
     if page.has_field?("captcha_answer")
       fill_in "captcha_answer", with: "GOODCAPTCHA"
     end
     click_button "Submit"
   end
+  subject
 end
 

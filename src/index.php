@@ -333,7 +333,7 @@ function render_html($title, $body) { global $config;
     </head>
     <body>
       <nav class="top-bar">
-        <span class="logo" style="font-weight: bold;"><?php echo $config['name']; ?></span>
+        <a href="/" class="logo" style="font-weight: bold;"><?php echo $config['name']; ?></a>
         <?php foreach ($config['board_ids'] as $board_id) {
           $board_path = '/' . $board_id . '/'; ?>
           / <a href="<?php echo $board_path; ?>"><?php echo $board_id; ?></a>
