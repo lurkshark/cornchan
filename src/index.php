@@ -686,12 +686,12 @@ function install($method, $data) { global $config;
   $preconditions['can_modify_files'] = @touch($test_file) && @unlink($test_file);
   $preconditions['gd_extension'] = extension_loaded('gd') && gd_info()['PNG Support'];
   $preconditions['dba_extension'] = extension_loaded('dba')
-      && (in_array('lmdb', dba_handlers()) || in_array('gdbm', dba_handlers()));
+      && (in_array('lmdb', dba_handlers()) || in_array('flatfile', dba_handlers()));
   $preconditions['can_create_db'] = $preconditions['can_modify_files']
       && $preconditions['gd_extension'] && $preconditions['dba_extension'];
 
   if ($preconditions['can_create_db'] && $method === 'POST') {
-    $dba_handler = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'gdbm';
+    $dba_handler = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'flatfile';
     // First create the static config file
     $config_file_data = '<?php
         define(\'CORN_DBA_PATH\', \'' . $data['dba_path'] . '\');
