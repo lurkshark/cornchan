@@ -1,6 +1,6 @@
 # cornchan
 [![Build Status](https://travis-ci.com/lurkshark/cornchan.svg?branch=master)](https://travis-ci.com/lurkshark/cornchan)
-[![W3C Validation](https://img.shields.io/w3c-validation/html?targetUrl=https%3A%2F%2Fcornchan.org%2Fcorn%2F)](https://validator.nu/?doc=https%3A%2F%2Fcornchan.org%2Fcorn%2F)
+[![W3C Validation](https://img.shields.io/w3c-validation/html?targetUrl=https%3A%2F%2Fcornchan.org)](https://validator.nu/?doc=https%3A%2F%2Fcornchan.org)
 
 ## Installation
 Cornchan is designed to run well on shared Apache+PHP hosting. It's tested on [NearlyFreeSpeech.NET](https://www.nearlyfreespeech.net/) but should work on almost any shared hosting that has the required PHP extensions. Cornchan will check all these requirements on its first run.
