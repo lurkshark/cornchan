@@ -3,12 +3,12 @@ $config = array(); // CORNCHAN
 define('CORN_VERSION', '0.7.1');
 header('X-Powered-By: Corn v' . CORN_VERSION);
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
-$config['config_location'] = $config['test_override'] ? '/tmp' : $_ENV['HOME'];
+$config['config_location'] = $config['test_override'] ? '/tmp' : __DIR__;
 $config['installed'] = @include($config['config_location'] . '/config.php');
 $config['remote_addr'] = $_SERVER['REMOTE_ADDR'];
 
 $db = $config['installed'] ? dba_open(CORN_DBA_PATH, 'r', CORN_DBA_HANDLER) : NULL;
-foreach (['name', 'language', 'anonymous', 'board_ids', 'secret', 'admin'] as $option) {
+foreach (['name', 'language', 'anonymous', 'board_ids'] as $option) {
   $config[$option] = $db ? dba_fetch('_config.' . $option, $db) : NULL;
 }
 
@@ -16,6 +16,32 @@ $config['board_ids'] = $config['board_ids'] ? json_decode($config['board_ids']) 
 // Set the values that'll be used on the install page
 $config['language'] = $config['language'] ?? 'en';
 $config['name'] = $config['name'] ?? 'cornchan';
+
+// Store a value to be encrypted in the db
+function dba_replace_encrypted($key, $value, $db_w) {
+  $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+  $ciphertext = sodium_crypto_secretbox($value, $nonce, CORN_MASTER_KEY);
+
+  dba_replace($key . '#ciphertext', $ciphertext, $db_w);
+  dba_replace($key . '#nonce', $nonce, $db_w);
+}
+
+// Delete a value that was encrypted in the db
+function dba_delete_encrypted($key, $db_w) {
+  dba_delete($key . '#ciphertext', $db_w);
+  dba_delete($key . '#nonce', $db_w);
+}
+
+// Retrieve an encrypted value from the db
+function dba_fetch_encrypted($key, $db_r) {
+  $ciphertext = dba_fetch($key . '#ciphertext', $db_r);
+  $nonce = dba_fetch($key . '#nonce', $db_r);
+
+  return sodium_crypto_secretbox_open($ciphertext, $nonce, CORN_MASTER_KEY);
+}
+
+$config['admin'] = $config['installed'] ? dba_fetch_encrypted('_config.admin', $db) : NULL;
+$config['secret'] = $config['installed'] ? CORN_SECRET : NULL;
 
 // Returns a HMAC token
 function generate_token($tag) { global $config;
@@ -33,7 +59,8 @@ function verify_token($tag, $token, $hours = 1) { global $config;
   }
   // Verify the hmac because timestamp is good
   $expected_message = implode('.', [$tag, $time]);
-  return hash_hmac('sha256', $expected_message, $config['secret']) == $hmac;
+  $expected_hmac = hash_hmac('sha256', $expected_message, $config['secret']);
+  return hash_equals($expected_hmac, $hmac);
 }
 
 
@@ -291,8 +318,8 @@ function render_install($preconditions) { global $config;
       <?php if ($preconditions['can_create_db']) { ?>
         <form method="post">
           <label for="dba_path">DB File Path</label>
-          <input type="text" name="dba_path"
-              value="<?php echo $config['config_location'] . '/cornchan.db'; ?>"
+          <input type="text" name="dba_path" readonly style="opacity:0.65;"
+              value="<?php echo $config['config_location'] . '/database.dbm'; ?>"
               id="dba_path" autocomplete="off">
           <label for="admin_password">Admin Password</label>
           <input type="text" name="admin_password" value="<?php echo bin2hex(random_bytes(8)); ?>"
@@ -410,8 +437,9 @@ function put_reply_data($db_w, $reply) { global $config;
   dba_replace($reply_key . '.reply_id', $reply_id, $db_w);
   dba_replace($reply_key . '.message', $reply['message'], $db_w);
   // dba_replace($reply_key . '.name', $reply['name'], $db_w);
-  dba_replace($reply_key . '.ip', $config['remote_addr'], $db_w);
   dba_replace($reply_key . '.time', time(), $db_w);
+
+  dba_replace_encrypted($reply_key . '.ip', $config['remote_addr'], $db_w);
 
   $thread_reply_count = intval(dba_fetch($thread_key . '.reply_count', $db_w));
   dba_replace($thread_key . '.reply_count', $thread_reply_count + 1, $db_w);
@@ -442,8 +470,9 @@ function put_thread_data($db_w, $thread) { global $config;
   dba_replace($thread_key . '.subject', $thread['subject'], $db_w);
   dba_replace($thread_key . '.message', $thread['message'], $db_w);
   // dba_replace($thread_key . '.name', $thread['name'], $db_w);
-  dba_replace($thread_key . '.ip', $config['remote_addr'], $db_w);
   dba_replace($thread_key . '.time', time(), $db_w);
+
+  dba_replace_encrypted($thread_key . '.ip', $config['remote_addr'], $db_w);
 
   dba_replace($thread_key . '.reply_count', '0', $db_w);
   dba_replace($thread_key . '#reply_head.next_reply_id', 'reply_tail', $db_w);
@@ -461,8 +490,9 @@ function delete_reply_data($db_w, $reply) {
   $reply = fetch_reply_data($reply['board_id'], $reply['thread_id'], $reply['reply_id']);
   if (!$reply) return;
 
+  dba_delete_encrypted($reply['key'] . '.ip', $db_w);
   $attributes = ['board_id', 'thread_id', 'reply_id', 'time',
-      'message', 'next_reply_id', 'prev_reply_id', 'ip'];
+      'message', 'next_reply_id', 'prev_reply_id'];
   foreach ($attributes as $attribute) {
     dba_delete($reply['key'] . '.' . $attribute, $db_w);
   }
@@ -484,8 +514,9 @@ function delete_thread_data($db_w, $thread) {
     delete_reply_data($db_w, $reply);
   }
 
+  dba_delete_encrypted($thread['key'] . '.ip', $db_w);
   $attributes = ['board_id', 'thread_id', 'time', 'reply_count',
-      'subject', 'message', 'next_thread_id', 'prev_thread_id', 'ip'];
+      'subject', 'message', 'next_thread_id', 'prev_thread_id'];
   foreach ($attributes as $attribute) {
     dba_delete($thread['key'] . '.' . $attribute, $db_w);
   }
@@ -511,7 +542,7 @@ function fetch_reply_data($board_id, $thread_id, $reply_id) { global $config, $d
   $reply['name'] = dba_fetch($reply_key . '.name', $db);
   if (empty($reply['name'])) $reply['name'] = $config['anonymous'];
 
-  $reply['ip'] = dba_fetch($reply_key . '.ip', $db);
+  $reply['ip'] = dba_fetch_encrypted($reply_key . '.ip', $db);
   $tag_source_data = $reply['ip'] . $reply['thread_id'];
   $reply['tag'] = hash_hmac('sha256', $tag_source_data, $config['secret']);
 
@@ -532,7 +563,7 @@ function fetch_thread_data($board_id, $thread_id) { global $config, $db;
   $thread['name'] = dba_fetch($thread_key . '.name', $db);
   if (empty($thread['name'])) $thread['name'] = $config['anonymous'];
 
-  $thread['ip'] = dba_fetch($thread_key . '.ip', $db);
+  $thread['ip'] = dba_fetch_encrypted($thread_key . '.ip', $db);
   $tag_source_data = $thread['ip'] . $thread['thread_id'];
   $thread['tag'] = hash_hmac('sha256', $tag_source_data, $config['secret']);
 
@@ -692,10 +723,14 @@ function install($method, $data) { global $config;
 
   if ($preconditions['can_create_db'] && $method === 'POST') {
     $dba_handler = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'flatfile';
+    $master_key = random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+    $secret = random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
     // First create the static config file
     $config_file_data = '<?php
-        define(\'CORN_DBA_PATH\', \'' . $data['dba_path'] . '\');
         define(\'CORN_DBA_HANDLER\', \'' . $dba_handler . '\');
+        define(\'CORN_DBA_PATH\', \'' . $data['dba_path'] . '\');
+        define(\'CORN_MASTER_KEY\', hex2bin(\'' . bin2hex($master_key) . '\'));
+        define(\'CORN_SECRET\', \'' . bin2hex($secret) . '\');
         return true; ?>';
     file_put_contents($config['config_location'] . '/config.php', $config_file_data)
       or exit('Can\'t write config file!');
@@ -715,8 +750,12 @@ function install($method, $data) { global $config;
     dba_replace('_config.anonymous', 'Cornonymous', $db_c);
     dba_replace('_config.language', $data['language'], $db_c);
     dba_replace('_config.board_ids', json_encode($board_ids), $db_c);
-    dba_replace('_config.admin', hash('sha256', $data['admin_password']), $db_c);
-    dba_replace('_config.secret', bin2hex(random_bytes(32)), $db_c);
+
+    $admin_nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+    $admin_hash = password_hash($data['admin_password'], PASSWORD_BCRYPT);
+    $admin_ciphertext = sodium_crypto_secretbox($admin_hash, $admin_nonce, $master_key);
+    dba_replace('_config.admin#ciphertext', $admin_ciphertext, $db_c);
+    dba_replace('_config.admin#nonce', $admin_nonce, $db_c);
     foreach ($board_ids as $board_id) {
       dba_replace($board_id . '.thread_count', '0', $db_c);
       dba_replace($board_id . '#thread_head.next_thread_id', 'thread_tail', $db_c);
@@ -772,8 +811,8 @@ function middleware_get_existing_role($cookies) {
 
 function middleware_fetch_role($data) { global $config;
   if (empty($data['password'])) return false;
-  $hashed_password = hash('sha256', $data['password']);
-  return $hashed_password === $config['admin'] ? '_admin' : false;
+  $is_admin = password_verify($data['password'], $config['admin']);
+  return $is_admin ? '_admin' : false;
 }
 
 // Establishes a level of trust for the request. Returns false
