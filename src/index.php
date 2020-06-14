@@ -3,7 +3,7 @@ $config = array(); // CORNCHAN
 define('CORN_VERSION', '0.7.1');
 header('X-Powered-By: Corn v' . CORN_VERSION);
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
-$config['config_location'] = $config['test_override'] ? '/tmp' : __DIR__;
+$config['config_location'] = $config['test_override'] ? '/tmp' : $_ENV['HOME'] ?? __DIR__;
 $config['installed'] = @include($config['config_location'] . '/config.php');
 $config['remote_addr'] = $_SERVER['REMOTE_ADDR'];
 
