@@ -3,7 +3,7 @@ $config = array(); // CORNCHAN
 define('CORN_VERSION', '0.7.1');
 header('X-Powered-By: Corn v' . CORN_VERSION);
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
-$config['config_location'] = $config['test_override'] ? '/tmp' : $_ENV['HOME'] ?? __DIR__;
+$config['config_location'] = $config['test_override'] ? '/tmp' : realpath($_ENV['HOME'] ?? __DIR__);
 $config['installed'] = @include($config['config_location'] . '/config.php');
 $config['remote_addr'] = $_SERVER['REMOTE_ADDR'];
 
@@ -712,8 +712,8 @@ function install($method, $data) { global $config;
 
   if ($preconditions['can_create_db'] && $method === 'POST') {
     $dba_handler = in_array('lmdb', dba_handlers()) ? 'lmdb' : 'ndbm';
-    $master_key = random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
-    $secret = random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+    $master_key = random_bytes(16);
+    $secret = random_bytes(16);
     // First create the static config file
     $config_file_data = '<?php
         define(\'CORN_DBA_HANDLER\', \'' . $dba_handler . '\');
