@@ -8,7 +8,7 @@ $config['installed'] = @include($config['config_location'] . '/config.php');
 $config['remote_addr'] = $_SERVER['REMOTE_ADDR'];
 
 $db = $config['installed'] ? dba_open(CORN_DBA_PATH, 'r', CORN_DBA_HANDLER) : NULL;
-foreach (['name', 'language', 'anonymous', 'board_ids'] as $option) {
+foreach (['name', 'language', 'anonymous', 'board_ids', 'admin'] as $option) {
   $config[$option] = $db ? dba_fetch('_config.' . $option, $db) : NULL;
 }
 
@@ -17,30 +17,20 @@ $config['board_ids'] = $config['board_ids'] ? json_decode($config['board_ids']) 
 $config['language'] = $config['language'] ?? 'en';
 $config['name'] = $config['name'] ?? 'cornchan';
 
-// Store a value to be encrypted in the db
-function dba_replace_encrypted($key, $value, $db_w) {
-  $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
-  $ciphertext = sodium_crypto_secretbox($value, $nonce, CORN_MASTER_KEY);
-
-  dba_replace($key . '#ciphertext', $ciphertext, $db_w);
-  dba_replace($key . '#nonce', $nonce, $db_w);
+// Encrypt and encode a plaintext
+function corn_encrypt($plaintext, $key = CORN_MASTER_KEY) {
+  $iv = openssl_random_pseudo_bytes(12); // aes-128-gcm uses a 96-bit iv
+  $ciphertext = openssl_encrypt($plaintext, 'aes-128-gcm', $key, 0, $iv, $tag);
+  return implode('.', array_map('bin2hex', [$iv, $ciphertext, $tag]));
 }
 
-// Delete a value that was encrypted in the db
-function dba_delete_encrypted($key, $db_w) {
-  dba_delete($key . '#ciphertext', $db_w);
-  dba_delete($key . '#nonce', $db_w);
+// Decrypt an encoded ciphertext
+function corn_decrypt($encoded_ciphertext, $key = CORN_MASTER_KEY) {
+  [$iv, $ciphertext, $tag] = array_map('hex2bin', explode('.', $encoded_ciphertext));
+  return openssl_decrypt($ciphertext, 'aes-128-gcm', $key, 0, $iv, $tag);
 }
 
-// Retrieve an encrypted value from the db
-function dba_fetch_encrypted($key, $db_r) {
-  $ciphertext = dba_fetch($key . '#ciphertext', $db_r);
-  $nonce = dba_fetch($key . '#nonce', $db_r);
-
-  return sodium_crypto_secretbox_open($ciphertext, $nonce, CORN_MASTER_KEY);
-}
-
-$config['admin'] = $config['installed'] ? dba_fetch_encrypted('_config.admin', $db) : NULL;
+$config['admin'] = $config['installed'] ? corn_decrypt($config['admin']) : NULL;
 $config['secret'] = $config['installed'] ? CORN_SECRET : NULL;
 
 // Returns a HMAC token
@@ -437,9 +427,8 @@ function put_reply_data($db_w, $reply) { global $config;
   dba_replace($reply_key . '.reply_id', $reply_id, $db_w);
   dba_replace($reply_key . '.message', $reply['message'], $db_w);
   // dba_replace($reply_key . '.name', $reply['name'], $db_w);
+  dba_replace($reply_key . '.ip', corn_encrypt($config['remote_addr']), $db_w);
   dba_replace($reply_key . '.time', time(), $db_w);
-
-  dba_replace_encrypted($reply_key . '.ip', $config['remote_addr'], $db_w);
 
   $thread_reply_count = intval(dba_fetch($thread_key . '.reply_count', $db_w));
   dba_replace($thread_key . '.reply_count', $thread_reply_count + 1, $db_w);
@@ -470,9 +459,9 @@ function put_thread_data($db_w, $thread) { global $config;
   dba_replace($thread_key . '.subject', $thread['subject'], $db_w);
   dba_replace($thread_key . '.message', $thread['message'], $db_w);
   // dba_replace($thread_key . '.name', $thread['name'], $db_w);
+  dba_replace($thread_key . '.ip', corn_encrypt($config['remote_addr']), $db_w);
   dba_replace($thread_key . '.time', time(), $db_w);
 
-  dba_replace_encrypted($thread_key . '.ip', $config['remote_addr'], $db_w);
 
   dba_replace($thread_key . '.reply_count', '0', $db_w);
   dba_replace($thread_key . '#reply_head.next_reply_id', 'reply_tail', $db_w);
@@ -490,9 +479,8 @@ function delete_reply_data($db_w, $reply) {
   $reply = fetch_reply_data($reply['board_id'], $reply['thread_id'], $reply['reply_id']);
   if (!$reply) return;
 
-  dba_delete_encrypted($reply['key'] . '.ip', $db_w);
   $attributes = ['board_id', 'thread_id', 'reply_id', 'time',
-      'message', 'next_reply_id', 'prev_reply_id'];
+      'ip', 'message', 'next_reply_id', 'prev_reply_id'];
   foreach ($attributes as $attribute) {
     dba_delete($reply['key'] . '.' . $attribute, $db_w);
   }
@@ -514,8 +502,7 @@ function delete_thread_data($db_w, $thread) {
     delete_reply_data($db_w, $reply);
   }
 
-  dba_delete_encrypted($thread['key'] . '.ip', $db_w);
-  $attributes = ['board_id', 'thread_id', 'time', 'reply_count',
+  $attributes = ['board_id', 'thread_id', 'time', 'ip', 'reply_count',
       'subject', 'message', 'next_thread_id', 'prev_thread_id'];
   foreach ($attributes as $attribute) {
     dba_delete($thread['key'] . '.' . $attribute, $db_w);
@@ -542,7 +529,8 @@ function fetch_reply_data($board_id, $thread_id, $reply_id) { global $config, $d
   $reply['name'] = dba_fetch($reply_key . '.name', $db);
   if (empty($reply['name'])) $reply['name'] = $config['anonymous'];
 
-  $reply['ip'] = dba_fetch_encrypted($reply_key . '.ip', $db);
+  $reply['ip'] = corn_decrypt(dba_fetch($reply_key . '.ip', $db));
+
   $tag_source_data = $reply['ip'] . $reply['thread_id'];
   $reply['tag'] = hash_hmac('sha256', $tag_source_data, $config['secret']);
 
@@ -563,7 +551,8 @@ function fetch_thread_data($board_id, $thread_id) { global $config, $db;
   $thread['name'] = dba_fetch($thread_key . '.name', $db);
   if (empty($thread['name'])) $thread['name'] = $config['anonymous'];
 
-  $thread['ip'] = dba_fetch_encrypted($thread_key . '.ip', $db);
+  $thread['ip'] = corn_decrypt(dba_fetch($thread_key . '.ip', $db));
+
   $tag_source_data = $thread['ip'] . $thread['thread_id'];
   $thread['tag'] = hash_hmac('sha256', $tag_source_data, $config['secret']);
 
@@ -751,11 +740,8 @@ function install($method, $data) { global $config;
     dba_replace('_config.language', $data['language'], $db_c);
     dba_replace('_config.board_ids', json_encode($board_ids), $db_c);
 
-    $admin_nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
     $admin_hash = password_hash($data['admin_password'], PASSWORD_BCRYPT);
-    $admin_ciphertext = sodium_crypto_secretbox($admin_hash, $admin_nonce, $master_key);
-    dba_replace('_config.admin#ciphertext', $admin_ciphertext, $db_c);
-    dba_replace('_config.admin#nonce', $admin_nonce, $db_c);
+    dba_replace('_config.admin', corn_encrypt($admin_hash, $master_key), $db_c);
     foreach ($board_ids as $board_id) {
       dba_replace($board_id . '.thread_count', '0', $db_c);
       dba_replace($board_id . '#thread_head.next_thread_id', 'thread_tail', $db_c);
