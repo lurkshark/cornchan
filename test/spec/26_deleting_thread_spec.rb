@@ -7,11 +7,11 @@ feature "Deleting a thread" do
   @last_seen_reply = nil
 
   background do
-    visit "/corn/"
+    visit "/index.php/corn/"
     test_thread_id = find_all(".thread").filter do |thread|
       !thread_with_replies or thread.find_all(".reply").length > 0
     end.first[:id]
-    visit "/corn/t/#{test_thread_id}" if go_to_thread
+    visit "/index.php/corn/t/#{test_thread_id}" if go_to_thread
     within find_by_id(test_thread_id) do
       @last_seen_thread = first(".post-subject").text
       @last_seen_reply = thread_with_replies ?
@@ -25,7 +25,7 @@ feature "Deleting a thread" do
 
   context "when on a board page" do
     scenario "deletes the thread and redirects to the board" do
-      expect(page).to have_current_path("/corn/")
+      expect(page).to have_current_path("/index.php/corn/")
       expect(page).to_not have_content(@last_seen_thread)
     end
   end
@@ -33,7 +33,7 @@ feature "Deleting a thread" do
   context "when on a thread page" do
     given(:go_to_thread) { true }
     scenario "deletes the thread and redirects to the board" do
-      expect(page).to have_current_path("/corn/")
+      expect(page).to have_current_path("/index.php/corn/")
       expect(page).to_not have_content(@last_seen_thread)
     end
   end

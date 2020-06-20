@@ -34,7 +34,7 @@ def lorem_ipsum(words)
 end
 
 def post_reply(which = :oldest)
-  visit "/corn/"
+  visit "/index.php/corn/"
   threads = find_all(".thread a.post-id")
   if which == :oldest
     threads.last.click
@@ -54,7 +54,7 @@ def post_reply(which = :oldest)
 end
 
 def post_thread
-  visit "/corn/"
+  visit "/index.php/corn/"
   subject = lorem_ipsum(5)
   within("#new-post") do
     fill_in "subject", with: subject

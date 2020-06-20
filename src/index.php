@@ -5,6 +5,7 @@ header('X-Powered-By: Corn v' . CORN_VERSION);
 $config['test_override'] = isset($_ENV['CORN_TEST_OVERRIDE']);
 $config['config_location'] = $config['test_override'] ? '/tmp' : realpath($_ENV['HOME'] ?? __DIR__);
 $config['installed'] = @include($config['config_location'] . '/config.php');
+$config['script_name'] = $_SERVER['SCRIPT_NAME'];
 $config['remote_addr'] = $_SERVER['REMOTE_ADDR'];
 
 $db = $config['installed'] ? dba_open(CORN_DBA_PATH, 'r', CORN_DBA_HANDLER) : NULL;
@@ -107,7 +108,7 @@ function render_captcha_form_fragment_html() { global $config;
 }
 
 function render_publish_form_fragment_html($board_or_thread, $trust, $prefill = array()) { global $config;
-  $form_action = '/' . $board_or_thread['board_id'];
+  $form_action = $config['script_name'] . '/' . $board_or_thread['board_id'];
   if (!empty($board_or_thread['thread_id'])) $form_action .= '/t/' . $board_or_thread['thread_id'];
   $form_action .= '/publish';
   ob_start(); ?>
@@ -133,7 +134,7 @@ function render_publish_form_fragment_html($board_or_thread, $trust, $prefill = 
 }
 
 function render_inline_delete_form_fragment_html($thread_or_reply) { global $config;
-  $form_action = '/' . $thread_or_reply['board_id'];
+  $form_action = $config['script_name'] . '/' . $thread_or_reply['board_id'];
   if (!empty($thread_or_reply['reply_id'])) $form_action .= '/t/' . $thread_or_reply['thread_id'];
   $form_action .= '/delete';
   ob_start(); ?>
@@ -216,7 +217,7 @@ function render_delete_body_html($board_or_thread, $trust, $prefill, $toast) { g
   $headline = !empty($board_or_thread['thread_id']) ?
       $board_or_thread['board_id'] . ' / ' . $board_or_thread['thread_id'] :
       $board_or_thread['board_id'];
-  $form_action = '/' . $board_or_thread['board_id'];
+  $form_action = $config['script_name'] . '/' . $board_or_thread['board_id'];
   if (!empty($prefill['reply_id'])) $form_action .= '/t/' . $board_or_thread['thread_id'];
   $form_action .= '/delete';
   ob_start(); ?>
@@ -340,7 +341,7 @@ function render_html($title, $body) { global $config;
       <title><?php echo $title; ?></title>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link rel="icon" href="/static/favicon.png">
+      <link rel="icon" href="static/favicon.png">
       <meta name="theme-color" content="#666">
       <style>
         <?php include('static/normalize.css'); ?>
@@ -350,9 +351,10 @@ function render_html($title, $body) { global $config;
     </head>
     <body>
       <nav class="top-bar">
-        <a href="/" class="logo" style="font-weight: bold;"><?php echo $config['name']; ?></a>
+        <a href="<?php echo $config['script_name']; ?>" class="logo"
+            style="font-weight: bold;"><?php echo $config['name']; ?></a>
         <?php foreach ($config['board_ids'] as $board_id) {
-          $board_path = '/' . $board_id . '/'; ?>
+          $board_path = $config['script_name'] . '/' . $board_id . '/'; ?>
           / <a href="<?php echo $board_path; ?>"><?php echo $board_id; ?></a>
         <?php } ?>
       </nav>
@@ -537,7 +539,7 @@ function fetch_reply_data($board_id, $thread_id, $reply_id) { global $config, $d
   $reply['message'] = dba_fetch($reply_key . '.message', $db);
   $reply['next_reply_id'] = dba_fetch($reply_key . '.next_reply_id', $db);
   $reply['prev_reply_id'] = dba_fetch($reply_key . '.prev_reply_id', $db);
-  $reply['href'] = '/' . $board_id . '/t/' . $thread_id . '#' . $reply_id;
+  $reply['href'] = $config['script_name'] . '/' . $board_id . '/t/' . $thread_id . '#' . $reply_id;
   $reply['key'] = $reply_key;
   return $reply;
 }
@@ -561,7 +563,7 @@ function fetch_thread_data($board_id, $thread_id) { global $config, $db;
   $thread['next_thread_id'] = dba_fetch($thread_key . '.next_thread_id', $db);
   $thread['prev_thread_id'] = dba_fetch($thread_key . '.prev_thread_id', $db);
   $thread['reply_count'] = intval(dba_fetch($thread_key . '.reply_count', $db));
-  $thread['href'] = '/' . $board_id . '/t/' . $thread_id;
+  $thread['href'] = $config['script_name'] . '/' . $board_id . '/t/' . $thread_id;
   $thread['key'] = $thread_key;
 
   $thread['replies'] = array();
@@ -580,7 +582,7 @@ function fetch_board_data($board_id) { global $config, $db;
   if (!in_array($board_id, $config['board_ids'])) return false;
   $board = ['board_id' => $board_id]; // Just for completeness
   $board['thread_count'] = intval(dba_fetch($board_id . '.thread_count', $db));
-  $board['href'] = '/' . $board_id . '/';
+  $board['href'] = $config['script_name'] . '/' . $board_id . '/';
 
   $board['threads'] = array();
   $current_thread_id = dba_fetch($board_id . '#thread_head.next_thread_id', $db);
@@ -752,7 +754,7 @@ function install($method, $data) { global $config;
     dba_close($db_c);
 
     // Redirect to root
-    header('Location: /');
+    header('Location: ' . $config['script_name']);
     return;
   }
 
@@ -887,6 +889,7 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
   error_404($params, $data, $trust);
 }
 
+$path = $_SERVER['PATH_INFO'] ?? '/';
 $method = $_SERVER['REQUEST_METHOD'];
-$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 entrypoint($method, $path, $_COOKIE, $_POST);
+phpinfo();
