@@ -15,7 +15,7 @@ feature "Installation page" do
     # to be changed for tests
     click_button "Install"
 
-    expect(page).to have_current_path("/")
+    expect(page).to have_current_path("/index.php")
     expect(page).to_not have_content("installation")
   end
 end

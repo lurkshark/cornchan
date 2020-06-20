@@ -5,7 +5,7 @@ feature "Deleting a reply" do
   @last_seen_reply = nil
 
   background do
-    visit "/corn/"
+    visit "/index.php/corn/"
     first(".reply a.post-id").click if go_to_thread
     within first(".reply") do
       @last_seen_reply = find(".post-message").text
@@ -18,7 +18,7 @@ feature "Deleting a reply" do
 
   context "when on a board page" do
     scenario "deletes the reply and redirects to the thread" do
-      expect(page).to have_current_path(/\/corn\/t\/\d+/)
+      expect(page).to have_current_path(/\/index.php\/corn\/t\/\d+/)
       expect(page).to_not have_content(@last_seen_reply)
     end
   end
@@ -26,7 +26,7 @@ feature "Deleting a reply" do
   context "when on a thread page" do
     given(:go_to_thread) { true }
     scenario "deletes the reply and redirects to the thread" do
-      expect(page).to have_current_path(/\/corn\/t\/\d+/)
+      expect(page).to have_current_path(/\/index.php\/corn\/t\/\d+/)
       expect(page).to_not have_content(@last_seen_reply)
     end
   end

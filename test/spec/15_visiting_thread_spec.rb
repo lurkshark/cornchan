@@ -1,10 +1,10 @@
 feature "Visiting a thread" do
   given(:thread_id) do
-    page.current_path.match(/\/corn\/t\/(\d+)/)[1]
+    page.current_path.match(/\/index.php\/corn\/t\/(\d+)/)[1]
   end
 
   background do
-    visit "/corn/"
+    visit "/index.php/corn/"
     first(".thread a.post-id").click
   end
 
@@ -16,7 +16,7 @@ feature "Visiting a thread" do
   scenario "has a form for posting a new thread" do
     within("#new-post") do
       # Let thread_new_spec handle the details
-      expect(find("form")["action"]).to eq("#{Capybara.app_host}/corn/t/#{thread_id}/publish")
+      expect(find("form")["action"]).to eq("#{Capybara.app_host}/index.php/corn/t/#{thread_id}/publish")
     end
   end
 end

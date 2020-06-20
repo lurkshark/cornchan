@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y \
   && docker-php-ext-configure gd --with-gd \
       --with-png-dir=/usr/include \
   && docker-php-ext-install dba gd \
-  && a2enmod rewrite \
   && a2enmod headers
 # Override for Travis CI build
 ENV CORN_TEST_OVERRIDE true
