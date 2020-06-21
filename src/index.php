@@ -892,4 +892,3 @@ function entrypoint($method, $path, $cookies, $data) { global $config;
 $path = $_SERVER['PATH_INFO'] ?? '/';
 $method = $_SERVER['REQUEST_METHOD'];
 entrypoint($method, $path, $_COOKIE, $_POST);
-phpinfo();
